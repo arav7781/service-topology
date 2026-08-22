@@ -1,0 +1,32 @@
+{
+  "_comment": [
+    "EXAMPLE ONLY - this file is not read from here. Copy it to",
+    "<target-repo>/.agents/hooks.json (the repository you are mapping, not",
+    "this one) and replace /ABSOLUTE/PATH/TO/service-topology with the real",
+    "path to this checkout. Read hooks/README.md first - it blocks git commit,",
+    "git push, docker compose up, live broker and database clients, dependency",
+    "installs, and writes outside service-topology/, which will interfere with",
+    "ordinary development work in the same session.",
+    "Do NOT place this file at .agents/hooks.json inside this checkout itself -",
+    "Antigravity auto-loads workspace hooks from there, and",
+    "the placeholder script path below does not exist yet.",
+    "This hook matters more on Antigravity than on the other hosts: the bundled",
+    "custom agents ship with commandExecutionPolicy: auto so that the read-only",
+    "scan scripts run without a prompt for every subtree."
+  ],
+  "topology-cartographer-guard": {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /ABSOLUTE/PATH/TO/service-topology/hooks/topology_guard.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

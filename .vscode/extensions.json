@@ -1,0 +1,15 @@
+{
+  "//": [
+    "Draw.io Integration renders the .drawio files topology-cartographer",
+    "generates - open one and it draws, with no command to run. VS Code,",
+    "Cursor, and Antigravity all read this file and offer to install what it",
+    "names. Nothing installs it for you, and nothing should: extensions do not",
+    "uniformly have permission to install other extensions across these hosts.",
+    "Add the same two lines to your own repository if you want the prompt",
+    "there - topology-cartographer will not write it for you, because it never",
+    "writes outside service-topology/."
+  ],
+  "recommendations": [
+    "hediet.vscode-drawio"
+  ]
+}

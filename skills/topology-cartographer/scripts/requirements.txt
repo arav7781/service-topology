@@ -1,0 +1,24 @@
+# Topology Cartographer helper scripts
+#
+# All six scripts and the shared topology_lib/ package use only the Python
+# standard library and require Python 3.8+. There is deliberately nothing to
+# install - `pip install -r requirements.txt` is a no-op, and no dependency may
+# be added without the user's approval.
+#
+# In particular:
+#   * YAML is parsed by a documented subset parser in topology_lib/configindex.py
+#     rather than by PyYAML;
+#   * diagram layout is a layered DAG placement in topology_lib/layout.py
+#     rather than graphviz;
+#   * mxGraph XML is built with xml.etree.ElementTree from the standard library.
+#
+# External tools used when present, never installed automatically:
+#   none - extraction reads files and nothing else. No git, no network, no
+#   package manager, no container runtime.
+#
+# Rendering the .drawio output needs the hediet.vscode-drawio extension in
+# VS Code, Cursor, or Antigravity. It is recommended via .vscode/extensions.json
+# and never installed automatically. The .mmd fallback needs nothing at all.
+#
+# Verify with:
+#   python3 -c 'import sys; assert sys.version_info >= (3, 8), sys.version'

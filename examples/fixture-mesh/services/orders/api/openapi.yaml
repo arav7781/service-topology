@@ -1,0 +1,19 @@
+openapi: 3.0.3
+info:
+  title: Orders API
+  version: 1.0.0
+servers:
+  - url: http://orders-svc:8080
+paths:
+  /orders/{id}:
+    get:
+      summary: Fetch one order
+      responses:
+        "200":
+          description: The order
+  /orders:
+    post:
+      summary: Create an order
+      responses:
+        "201":
+          description: Created

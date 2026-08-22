@@ -1,0 +1,36 @@
+{
+  "name": "arav7781",
+  "owner": {
+    "name": "Arav Saxena",
+    "url": "https://github.com/arav7781"
+  },
+  "metadata": {
+    "description": "Plugins by Arav Saxena",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "topology-cartographer",
+      "source": "./",
+      "description": "Evidence-first service topology mapping. Scans a repository for Kafka producer/consumer bindings and synchronous service-to-service calls, then renders .drawio and Mermaid architecture diagrams where every edge cites a file and line. Mapping only - never modifies the analysed repository, never executes it, never contacts a live system.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Arav Saxena"
+      },
+      "homepage": "https://github.com/arav7781/service-topology",
+      "repository": "https://github.com/arav7781/service-topology",
+      "license": "MIT",
+      "keywords": [
+        "architecture",
+        "diagrams",
+        "kafka",
+        "microservices",
+        "drawio",
+        "topology",
+        "service-map",
+        "code-review"
+      ],
+      "category": "productivity"
+    }
+  ]
+}

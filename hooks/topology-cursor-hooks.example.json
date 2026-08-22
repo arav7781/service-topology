@@ -1,0 +1,35 @@
+{
+  "_comment": [
+    "EXAMPLE ONLY - this file is not read from here. Copy it to",
+    "<target-repo>/.cursor/hooks.json (the repository you are mapping, not",
+    "this one) and replace /ABSOLUTE/PATH/TO/service-topology with the real",
+    "path to this checkout. Read hooks/README.md first - it blocks git commit,",
+    "git push, docker compose up, live broker and database clients, dependency",
+    "installs, and writes outside service-topology/, which will interfere with",
+    "ordinary development work in the same session.",
+    "Do NOT place this file at .cursor/hooks.json inside this checkout itself -",
+    "Cursor auto-loads project hooks from there, and the",
+    "placeholder script path below does not exist yet.",
+    "Both events are registered deliberately: preToolUse covers every tool",
+    "including file writes, and beforeShellExecution is the dedicated terminal",
+    "gate that also runs for cloud agents. Shell commands are therefore checked",
+    "twice, which is harmless - the guard is idempotent."
+  ],
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "command": "python3 /ABSOLUTE/PATH/TO/service-topology/hooks/topology_guard.py",
+        "timeout": 10
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "type": "command",
+        "command": "python3 /ABSOLUTE/PATH/TO/service-topology/hooks/topology_guard.py",
+        "timeout": 10
+      }
+    ]
+  }
+}

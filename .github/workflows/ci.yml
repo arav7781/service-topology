@@ -1,0 +1,173 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Oldest supported and a current version — the scripts are
+        # standard-library-only, so this is compatibility, not deps.
+        python-version: ["3.8", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Everything compiles
+        run: |
+          python3 -m py_compile \
+            skills/topology-cartographer/scripts/*.py \
+            skills/topology-cartographer/scripts/topology_lib/*.py \
+            mcp-server/*.py hooks/*.py tools/*.py
+
+      - name: The four host trees agree
+        run: python3 tools/sync_hosts.py
+
+      - name: Every script answers --help and --example
+        run: |
+          set -euo pipefail
+          S=skills/topology-cartographer/scripts
+          for script in scan_repository build_graph_model layout_graph \
+                        render_drawio render_mermaid validate_graph_model; do
+            python3 "$S/$script.py" --help > /dev/null
+            python3 "$S/$script.py" --example > /dev/null
+          done
+          python3 mcp-server/topology_mcp_server.py --list-tools > /dev/null
+
+      - name: Full pipeline over the fixture, twice, byte-identically
+        run: |
+          set -euo pipefail
+          S=skills/topology-cartographer/scripts
+          run() {
+            out="$1"
+            mkdir -p "$out"
+            python3 $S/scan_repository.py examples/fixture-mesh -o "$out/scan.json"
+            python3 $S/build_graph_model.py --input "$out/scan.json" \
+              --output-root "$out" -o "$out/graph-model.json" \
+              --evidence-out "$out/evidence/sources.md"
+            python3 $S/layout_graph.py "$out/graph-model.json" \
+              --output-root "$out" -o "$out/laid-out.json"
+            python3 $S/render_drawio.py "$out/laid-out.json" --mode all \
+              --output-dir "$out" --output-root "$out"
+            python3 $S/render_mermaid.py "$out/laid-out.json" --mode all \
+              --output-dir "$out" --output-root "$out"
+          }
+          run run-a
+          run run-b
+          diff -r run-a run-b
+
+      - name: Every citation resolves to a real line in the fixture
+        run: |
+          python3 skills/topology-cartographer/scripts/validate_graph_model.py \
+            run-a/graph-model.json --repo examples/fixture-mesh
+
+      - name: Generated .drawio is well-formed and internally consistent
+        run: |
+          python3 - <<'EOF'
+          import glob, sys, xml.etree.ElementTree as ET
+          files = sorted(glob.glob("run-a/**/*.drawio", recursive=True))
+          assert files, "no .drawio files were rendered"
+          for path in files:
+              root = ET.parse(path).getroot()
+              assert root.tag == "mxfile", (path, root.tag)
+              ids = set(node.get("id") for node in root.iter() if node.get("id"))
+              assert {"0", "1"} <= ids, (path, "missing the mxGraph root cells")
+              edges = [c for c in root.iter("mxCell") if c.get("edge") == "1"]
+              assert edges, (path, "rendered no edges")
+              for edge in edges:
+                  assert edge.get("source") in ids, (path, edge.get("source"))
+                  assert edge.get("target") in ids, (path, edge.get("target"))
+              print("ok", path, len(edges), "edges")
+          EOF
+
+      - name: Micro topology is a strict subset of the master
+        run: |
+          python3 - <<'EOF'
+          import sys
+          sys.path.insert(0, "skills/topology-cartographer/scripts")
+          from topology_lib.model import GraphModel, subgraph_for_service
+          master = GraphModel.load("run-a/graph-model.json")
+          assert master.services, "no services were discovered"
+          for service_id in sorted(master.services):
+              sub = subgraph_for_service(master, service_id)
+              assert set(sub.nodes) <= set(master.nodes), service_id
+              assert all(edge in master.edges for edge in sub.edges), service_id
+              assert len(sub.nodes) <= len(master.nodes), service_id
+              print("ok", service_id, len(sub.nodes), "of", len(master.nodes), "nodes")
+          EOF
+
+      - name: MCP server answers a real client over stdio
+        run: python3 mcp-server/test_client.py
+
+      - name: Hook denies mapping-only violations in every host dialect
+        run: |
+          set -euo pipefail
+          deny() {
+            out=$(echo "$1" | python3 hooks/topology_guard.py)
+            echo "$out" | grep -q '"deny"' || { echo "MISSING DENY for payload: $1"; exit 1; }
+          }
+          deny '{"tool_name":"Write","tool_input":{"file_path":"'"$PWD"'/src/app.py"},"cwd":"'"$PWD"'"}'
+          deny '{"tool_name":"Write","tool_input":{"file_path":"'"$PWD"'/service-topology/master-topology.drawio"},"cwd":"'"$PWD"'"}'
+          deny '{"hook_event_name":"beforeShellExecution","command":"docker compose up -d","cwd":"'"$PWD"'"}'
+          deny '{"toolCall":{"name":"run_command","args":{"CommandLine":"kafka-topics --list","Cwd":"'"$PWD"'"}}}'
+          deny '{"tool_name":"Bash","tool_input":{"command":"psql -h db -c select"},"cwd":"'"$PWD"'"}'
+          out=$(echo '{"tool_name":"Bash","tool_input":{"command":"grep -rn KafkaTemplate services/"},"cwd":"'"$PWD"'"}' \
+            | python3 hooks/topology_guard.py)
+          test -z "$out" || { echo "UNEXPECTED OUTPUT for allowed command: $out"; exit 1; }
+
+      - name: Nothing was written outside the output roots
+        run: |
+          set -euo pipefail
+          git status --porcelain --untracked-files=all \
+            | grep -v '^?? run-a/' | grep -v '^?? run-b/' > /tmp/dirty || true
+          if [ -s /tmp/dirty ]; then
+            echo "the pipeline modified tracked or unexpected files:"; cat /tmp/dirty; exit 1
+          fi
+
+  manifests:
+    name: Manifests and metadata
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Plugin and marketplace manifests are valid JSON
+        run: |
+          python3 -m json.tool .claude-plugin/plugin.json > /dev/null
+          python3 -m json.tool .claude-plugin/marketplace.json > /dev/null
+
+      - name: Plugin and marketplace versions agree
+        run: |
+          python3 - <<'EOF'
+          import json
+          plugin = json.load(open(".claude-plugin/plugin.json"))
+          market = json.load(open(".claude-plugin/marketplace.json"))
+          entry = next(p for p in market["plugins"] if p["name"] == plugin["name"])
+          assert entry.get("version") == plugin["version"], (
+              f'marketplace lists {entry.get("version")}, plugin.json says {plugin["version"]}'
+          )
+          print(f'ok: {plugin["name"]} {plugin["version"]}')
+          EOF
+
+      - name: Hook example configs are valid JSON
+        run: |
+          for f in hooks/*.example.json; do
+            python3 -m json.tool "$f" > /dev/null && echo "ok: $f"
+          done
+
+      - name: Host MCP configs are valid JSON
+        run: |
+          for f in .vscode/mcp.json .cursor/mcp.json .agents/mcp_config.json; do
+            python3 -m json.tool "$f" > /dev/null && echo "ok: $f"
+          done

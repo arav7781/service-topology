@@ -1,0 +1,9 @@
+{
+  "name": "notifications-svc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fixture notifications service - does not run.",
+  "dependencies": {
+    "kafkajs": "^2.2.4"
+  }
+}

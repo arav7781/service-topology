@@ -1,0 +1,35 @@
+# Topology Cartographer output (generated per analysed repository)
+service-topology/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editors / OS
+.DS_Store
+.idea/
+*.swp
+
+# .vscode/ is local, with two deliberate exceptions: the extension
+# recommendation that makes .drawio files render, and this repository's own
+# MCP server registration. See mcp-server/README.md.
+.vscode/*
+!.vscode/extensions.json
+!.vscode/mcp.json
+
+# Local host overrides. The hook config files in particular are auto-loaded by
+# their host from these paths, so a local copy made for testing must never be
+# committed - see hooks/README.md.
+.claude/settings.local.json
+.cursor/hooks.json
+.agents/hooks.json
+
+# Determinism-check scratch output (see CONTRIBUTING.md)
+/run-a/
+/run-b/

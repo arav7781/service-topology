@@ -1,0 +1,23 @@
+{
+  "_comment": [
+    "EXAMPLE ONLY - this file is not read from here. Copy it into",
+    "<target-repo>/.github/hooks/topology-guard.json (the repository you are",
+    "mapping, not this one) and replace /ABSOLUTE/PATH/TO/service-topology",
+    "with the real path to this checkout. Read hooks/README.md first - it",
+    "blocks git commit, git push, docker compose up, live broker and database",
+    "clients, dependency installs, and writes outside service-topology/, which",
+    "will interfere with ordinary development work in the same session.",
+    "Do NOT place this file at .github/hooks/ inside this checkout itself -",
+    "GitHub Copilot auto-loads any *.json file found there,",
+    "and the placeholder script path below does not exist yet."
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "python3 /ABSOLUTE/PATH/TO/service-topology/hooks/topology_guard.py",
+        "timeout": 10
+      }
+    ]
+  }
+}

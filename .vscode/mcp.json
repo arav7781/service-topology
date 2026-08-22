@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "topology-cartographer": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/mcp-server/topology_mcp_server.py"
+      ]
+    }
+  }
+}

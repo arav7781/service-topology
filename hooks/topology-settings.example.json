@@ -1,0 +1,68 @@
+{
+  "_comment": [
+    "EXAMPLE ONLY - this file is not read by Claude Code and is not installed",
+    "automatically. Copy the pieces you want into .claude/settings.json in the",
+    "repository you are mapping, or into ~/.claude/settings.json, and replace",
+    "/ABSOLUTE/PATH/TO/service-topology with the real checkout path.",
+    "Read hooks/README.md before enabling the hook - it blocks git commit,",
+    "git push, docker compose up, live broker and database clients, dependency",
+    "installs, and writes outside service-topology/, which will interfere with",
+    "ordinary development work in the same session."
+  ],
+
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(python3 */skills/topology-cartographer/scripts/scan_repository.py:*)",
+      "Bash(python3 */skills/topology-cartographer/scripts/build_graph_model.py:*)",
+      "Bash(python3 */skills/topology-cartographer/scripts/layout_graph.py:*)",
+      "Bash(python3 */skills/topology-cartographer/scripts/render_drawio.py:*)",
+      "Bash(python3 */skills/topology-cartographer/scripts/render_mermaid.py:*)",
+      "Bash(python3 */skills/topology-cartographer/scripts/validate_graph_model.py:*)",
+      "Bash(git status:*)",
+      "Bash(git ls-files:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)"
+    ],
+    "ask": [
+      "Bash(make:*)",
+      "Bash(mvn:*)",
+      "Bash(gradle:*)",
+      "Bash(npm run:*)"
+    ],
+    "deny": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git checkout:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(docker compose up:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(terraform apply:*)",
+      "Bash(kafka-topics:*)",
+      "Bash(psql:*)",
+      "Bash(mysql:*)",
+      "Bash(redis-cli:*)",
+      "Bash(pip install:*)",
+      "Bash(npm install:*)"
+    ]
+  },
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /ABSOLUTE/PATH/TO/service-topology/hooks/topology_guard.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
