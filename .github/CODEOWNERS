@@ -1,0 +1,10 @@
+# Review routing. Every pull request automatically requests review from the
+# owner below. To make review *required*, enable "Require review from Code
+# Owners" in the branch-protection rule for main.
+*   @arav7781
+
+# Safety-critical surfaces always route to the owner explicitly, even if the
+# wildcard above is ever narrowed.
+/hooks/            @arav7781
+/.claude-plugin/   @arav7781
+/SECURITY.md       @arav7781

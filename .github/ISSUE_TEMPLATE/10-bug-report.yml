@@ -1,0 +1,73 @@
+name: Bug report
+description: Something in the tooling broke — a script error, the guard hook misfiring, the skill not loading, a host-tree sync problem, the MCP server failing to connect.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is for **mechanical** problems — the pipeline crashed, the
+        hook denied something it shouldn't have, the MCP server hung. If the
+        tooling ran fine but the *diagram* is wrong (a missed binding, a false
+        edge, a misjudged service boundary), use the **Extraction issue**
+        form instead — that's the report this project is actually built to
+        act on.
+  - type: dropdown
+    id: host
+    attributes:
+      label: Host
+      options:
+        - Claude Code
+        - GitHub Copilot (VS Code)
+        - Cursor
+        - Antigravity
+        - Not host-specific (script / repo tooling / MCP server)
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Skill loading / activation
+        - A helper script (scripts/*.py or topology_lib/)
+        - hooks/topology_guard.py
+        - tools/sync_hosts.py
+        - mcp-server/
+        - Templates / documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Include the exact command or prompt, and the full error output or wrong behaviour.
+      placeholder: |
+        Ran: python3 skills/topology-cartographer/scripts/scan_repository.py ...
+        Got: Traceback ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, host version.
+      placeholder: macOS 15.5 · Python 3.12.4 · Claude Code 2.x
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I reproduced this on the latest `main`.
+          required: true
+        - label: This is not a security issue (those go through [SECURITY.md](https://github.com/arav7781/service-topology/blob/main/SECURITY.md), privately).
+          required: true

@@ -1,0 +1,76 @@
+name: Extraction issue
+description: The pipeline ran fine, but the diagram is wrong — a missed binding, an edge that doesn't exist, or a misjudged service boundary. This is the most valuable report you can file.
+title: "[extraction] "
+labels: ["extraction"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The rule this project holds itself to: **a missing arrow beats a
+        wrong arrow.** If you found a case that breaks that rule — an edge in
+        the diagram that doesn't actually exist in the code — that's a real
+        bug, not a tuning nitpick.
+  - type: dropdown
+    id: failure-class
+    attributes:
+      label: What went wrong
+      options:
+        - False edge — the diagram shows a connection that isn't in the code
+        - Missed edge — a real binding wasn't extracted at all
+        - Wrong evidence tag — an edge is [CODE] but shouldn't be (or the reverse)
+        - Wrong service boundary — a service was split, merged, or missed
+        - Wrong label — the topic/method/key shown doesn't match the code
+        - Citation is wrong — the file:line doesn't point at what the edge claims
+    validations:
+      required: true
+  - type: dropdown
+    id: ecosystem
+    attributes:
+      label: Ecosystem involved
+      options:
+        - Spring Kafka / Kafka Streams / JVM client
+        - kafka-python / confluent-kafka / aiokafka / faust
+        - kafkajs / node-rdkafka / NestJS
+        - segmentio/kafka-go / sarama
+        - Spring Cloud Stream (config bindings)
+        - HTTP client (requests/axios/RestTemplate/Feign/net-http/resty)
+        - gRPC (.proto / generated stubs)
+        - OpenAPI spec
+        - Config resolution (application.yml/.env/compose/Helm/Terraform)
+        - Service boundary detection
+        - Datastore/cache connection strings
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Minimal reproducing snippet
+      description: A few lines is enough — you do not need to share your real repository. Paste the code that should (or shouldn't) have produced an edge.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: got
+    attributes:
+      label: What the tool produced
+      description: Paste the relevant edge(s) from graph-model.json or evidence/sources.md.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What it should have produced
+      description: If correct, would this edge have been [CODE] or [INFERENCE]? Why?
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked the relevant playbook (kafka-extraction-playbook.md or sync-call-extraction-playbook.md) and this isn't documented as a known gap.
+          required: true
+        - label: My snippet is minimal and does not contain anything sensitive from a real codebase.
+          required: true

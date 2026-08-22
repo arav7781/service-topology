@@ -1,0 +1,59 @@
+name: Feature request
+description: Propose a new ecosystem, a layout improvement, a new host, or a change to the graph model.
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check [docs/implementation-roadmap.md](https://github.com/arav7781/service-topology/blob/main/docs/implementation-roadmap.md)
+        first — your idea may already be scheduled for a version, or may
+        already be listed as an explicit non-goal (runtime observation, a
+        custom renderer, LLM-authored XML).
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New Kafka ecosystem / client library
+        - New sync-call framework (HTTP/gRPC)
+        - New message broker (RabbitMQ, SNS/SQS, Pub/Sub, ...)
+        - Config resolution (a new config format or source)
+        - Layout / rendering
+        - New host support
+        - MCP server
+        - Graph model / schema
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem, as observed
+      description: What real repository or workflow does this affect? A concrete case beats a general one.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: The smallest version that solves the observed problem. What is explicitly out of scope?
+    validations:
+      required: true
+  - type: textarea
+    id: cost
+    attributes:
+      label: What it costs
+      description: Does this add a dependency (the project has zero by design), affect determinism, or change what counts as [CODE] vs [INFERENCE]?
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmations
+      options:
+        - label: I checked the roadmap and this doesn't conflict with a stated non-goal.
+          required: true
+        - label: I searched existing issues for prior proposals of this.
+          required: true

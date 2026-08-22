@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability (private)
+    url: https://github.com/arav7781/service-topology/security/advisories/new
+    about: Guard-hook bypasses, path-traversal in SafeWriter, or anything that could write outside service-topology/ — never a public issue. See SECURITY.md.
