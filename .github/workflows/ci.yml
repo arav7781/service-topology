@@ -19,7 +19,7 @@ jobs:
         # standard-library-only, so this is compatibility, not deps.
         python-version: ["3.8", "3.12"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -140,7 +140,7 @@ jobs:
     name: Manifests and metadata
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Plugin and marketplace manifests are valid JSON
         run: |
