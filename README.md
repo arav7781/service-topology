@@ -1,8 +1,8 @@
 <div align="center">
 
-# Topology Cartographer
+<img alt="Topology Cartographer — from code to topology to diagrams. Evidence-first, traceable, deterministic. Works with Claude Code, GitHub Copilot, Cursor, and Antigravity." src="assets/banner.png" width="100%">
 
-**Evidence-first service topology mapping for Claude Code, GitHub Copilot, Cursor, and Antigravity**
+<br>
 
 [![License](https://img.shields.io/badge/license-MIT-0969da?style=flat-square)](LICENSE)
 [![CI](https://github.com/arav7781/service-topology/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arav7781/service-topology/actions/workflows/ci.yml)
