@@ -101,7 +101,13 @@ python3 scripts/layout_graph.py service-topology/graph-model.json \
 ```
 
 Cycle-breaking, layering, barycentre ordering, placement, and routing - all
-deterministic, all in the standard library. Do not compute a coordinate
+deterministic, all in the standard library.
+
+`--theme` is chosen at this step rather than at render time, because a theme
+fixes how big each node is drawn as well as how it is styled: `streams` (the
+default) places fixed-size circles and diamonds in wide columns, `classic`
+places boxes fitted to their labels. The chosen theme is stamped into the
+layout block and the renderers follow it. Do not compute a coordinate
 yourself, and do not adjust one the script produced: the determinism is what
 makes two runs diffable, and a single hand-placed node destroys it.
 
@@ -124,7 +130,11 @@ fallback that needs nothing installed and renders in a pull request, a Markdown
 preview, or a chat window.
 
 Both carry the same evidence distinction: solid means `[CODE]`, dashed grey
-means it is not confirmed.
+means it is not confirmed - and both draw the same shapes, so the `.mmd` and the
+`.drawio` read as one diagram rather than two.
+
+Passing `--theme` here overrides the stamped theme and re-runs the layout, so
+the shapes and the coordinates can never disagree.
 
 ---
 

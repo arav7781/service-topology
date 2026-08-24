@@ -275,16 +275,27 @@ and
 
 ### What a diagram actually shows
 
-- **Rounded blue box** — a service
-- **Orange hexagon** — a Kafka topic
-- **Grey dashed hexagon** — a topic whose name is an unresolved config
-  reference
-- **Green / purple cylinder** — a datastore / a cache
-- **Grey cloud** — an external API
-- **Grey dashed box** — a service known only because something calls it, with
-  no manifest found in this repository
+The default `streams` theme draws the Kafka Streams dataflow idiom, where
+**kind is carried by shape rather than by fill** — at three hundred nodes a
+reader never stops telling a circle from a diamond, and leaving fill unset lets
+the diagram follow draw.io's own light or dark setting.
+
+- **Circle** — a Kafka topic
+- **Grey dashed circle** — a topic whose name is an unresolved config reference
+- **Diamond** — a service, the processor between two topics
+- **Grey dashed diamond** — a service known only because something calls it,
+  with no manifest found in this repository
+- **Cylinder** — a datastore (purple: a cache)
+- **Off-page connector** — an external API
 - **Solid arrow** — `[CODE]`, read directly
 - **Dashed grey arrow** — `[INFERENCE]` or `[UNVERIFIED]`, not confirmed
+
+Pass `--theme classic` to `layout_graph.py` and `render_drawio.py` for the
+label-fitted boxes this skill drew before themes existed — blue service, orange
+topic hexagon, grey external cloud — which is more compact for a small graph.
+A theme fixes node sizes as well as styles, so the layout stamps its theme into
+the model and the renderers follow it; see
+[drawio-xml-spec.md](skills/topology-cartographer/references/drawio-xml-spec.md).
 
 ## How it works
 

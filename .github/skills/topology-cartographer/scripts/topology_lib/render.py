@@ -10,6 +10,12 @@ artefact.
 The XML is built with `xml.etree.ElementTree` rather than string formatting, so
 a service called `Orders & Billing <v2>` cannot produce a file draw.io refuses
 to open.
+
+Which shapes and strokes are used comes from `theme.py`, not from here. A
+renderer must style the diagram for the theme it was *laid out* under, because
+a theme fixes node sizes as well as node styles - so when no theme is named,
+these functions read the one `layout_all` stamped into the layout block rather
+than falling back to the default.
 """
 
 from __future__ import annotations
@@ -24,87 +30,43 @@ from .model import (
     EDGE_CONSUMES,
     EDGE_DEPENDS,
     EDGE_PRODUCES,
-    KIND_CACHE,
-    KIND_DATASTORE,
-    KIND_EXTERNAL_API,
     KIND_SERVICE,
     KIND_TOPIC,
     Edge,
     GraphModel,
     Node,
 )
+from .theme import DEFAULT_THEME, Theme, get_theme
 
 RENDERER_VERSION = "1.0.0"
 DRAWIO_AGENT = "topology-cartographer/" + RENDERER_VERSION
 
-# draw.io reads this to decide which shape library rendered the file. Anything
-# unrecognised falls back to a rectangle rather than failing to open, but these
-# are all core mxGraph shapes, so nothing here depends on an extension.
-NODE_STYLES = {
-    KIND_SERVICE: (
-        "rounded=1;whiteSpace=wrap;html=1;arcSize=12;"
-        "fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#10314f;"
-        "fontSize=12;fontStyle=1;verticalAlign=middle;align=center;"
-    ),
-    KIND_TOPIC: (
-        "shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;"
-        "fixedSize=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#653700;"
-        "fontSize=11;verticalAlign=middle;align=center;"
-    ),
-    KIND_DATASTORE: (
-        "shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;"
-        "size=12;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#1f3d18;"
-        "fontSize=11;verticalAlign=middle;align=center;"
-    ),
-    KIND_CACHE: (
-        "shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;"
-        "size=12;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#3b2a45;"
-        "fontSize=11;verticalAlign=middle;align=center;"
-    ),
-    KIND_EXTERNAL_API: (
-        "ellipse;shape=cloud;whiteSpace=wrap;html=1;"
-        "fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;"
-        "fontSize=11;verticalAlign=middle;align=center;"
-    ),
-}
-UNRESOLVED_TOPIC_STYLE = (
-    "shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;"
-    "fixedSize=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;"
-    "fontColor=#666666;fontSize=11;verticalAlign=middle;align=center;"
-)
-
-# A service nothing in this repository declares - we know it only because
-# something calls it. Drawn hollow so it never reads as a mapped service.
-REFERENCED_ONLY_SERVICE_STYLE = (
-    "rounded=1;whiteSpace=wrap;html=1;arcSize=12;dashed=1;"
-    "fillColor=none;strokeColor=#999999;fontColor=#777777;"
-    "fontSize=12;fontStyle=2;verticalAlign=middle;align=center;"
-)
-
-_EDGE_BASE = ("edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;"
-              "orthogonalLoop=1;endArrow=blockThin;endFill=1;fontSize=10;")
-
-EDGE_COLOURS = {
-    (EDGE_PRODUCES, ""): "#d79b00",
-    (EDGE_CONSUMES, ""): "#82b366",
-    (EDGE_CALLS, "http"): "#6c8ebf",
-    (EDGE_CALLS, "grpc"): "#9673a6",
-    (EDGE_CALLS, ""): "#6c8ebf",
-    (EDGE_DEPENDS, ""): "#666666",
-}
-
-# Anything not [CODE] is drawn dashed and grey, and listed separately. This is
-# the visual half of the rule that an inference never passes for a fact.
-INFERRED_EDGE_EXTRA = ("strokeColor=#999999;fontColor=#8c8c8c;"
-                       "dashed=1;dashPattern=6 6;")
-
 # `<br>`, not `&#10;`: the legend cell is html=1 like every other label, so a
-# newline entity collapses and the three lines run together.
-LEGEND_TEXT = (
-    "<b>Legend</b><br>"
+# newline entity collapses and the lines run together.
+_LEGEND_EVIDENCE = (
     "solid = [CODE], read directly<br>"
     "dashed grey = [INFERENCE]/[UNVERIFIED], not confirmed"
 )
+
+# The evidence half is the same whatever the theme; the shape half is not, and
+# a legend naming shapes the diagram does not use is worse than no legend.
+LEGEND_TEXT = {
+    "streams": (
+        "<b>Legend</b><br>"
+        "circle = topic&nbsp;&nbsp;diamond = service<br>"
+        "cylinder = datastore/cache&nbsp;&nbsp;"
+        "off-page = external system<br>"
+        + _LEGEND_EVIDENCE
+    ),
+    "classic": (
+        "<b>Legend</b><br>"
+        + _LEGEND_EVIDENCE
+    ),
+}
+
+
+def legend_text(theme: Theme) -> str:
+    return LEGEND_TEXT.get(theme.name, LEGEND_TEXT[DEFAULT_THEME])
 
 
 # --------------------------------------------------------------------------- #
@@ -136,24 +98,31 @@ def edge_label(edge: Edge, model: GraphModel, include_topic: bool = False) -> st
     return "\n".join(parts)
 
 
-def edge_style(edge: Edge) -> str:
+def edge_style(edge: Edge, theme: Optional[Theme] = None,
+               flow_animation: Optional[bool] = None) -> str:
+    active = theme if theme is not None else get_theme(None)
+    style = active.edge_base
+    animate = active.flow_animation if flow_animation is None else flow_animation
+    if animate:
+        style += "flowAnimation=1;"
     if edge.confirmed:
-        colour = (EDGE_COLOURS.get((edge.type, edge.protocol))
-                  or EDGE_COLOURS.get((edge.type, ""))
-                  or "#6c8ebf")
-        return _EDGE_BASE + "strokeColor={0};".format(colour)
+        colour = (active.edge_colours.get((edge.type, edge.protocol))
+                  or active.edge_colours.get((edge.type, ""))
+                  or active.edge_fallback_colour)
+        return style + "strokeColor={0};".format(colour)
     # Unconfirmed edges lose their protocol colour entirely rather than
     # carrying two strokeColor declarations and relying on the last one winning.
-    return _EDGE_BASE + INFERRED_EDGE_EXTRA
+    return style + active.inferred_edge_extra
 
 
-def node_style(node: Node) -> str:
+def node_style(node: Node, theme: Optional[Theme] = None) -> str:
+    active = theme if theme is not None else get_theme(None)
     attributes = dict(node.attributes)
     if node.kind == KIND_TOPIC and attributes.get("unresolved") == "true":
-        return UNRESOLVED_TOPIC_STYLE
+        return active.unresolved_topic_style
     if node.kind == KIND_SERVICE and attributes.get("origin") == "referenced-only":
-        return REFERENCED_ONLY_SERVICE_STYLE
-    return NODE_STYLES.get(node.kind, NODE_STYLES[KIND_SERVICE])
+        return active.referenced_only_service_style
+    return active.node_styles.get(node.kind, active.node_styles[KIND_SERVICE])
 
 
 def _html(text: str) -> str:
@@ -178,8 +147,14 @@ def _tooltip(citations: List[str], note: str = "") -> str:
 
 def render_drawio(model: GraphModel, diagram: Dict[str, Any],
                   include_topic_labels: bool = False,
-                  include_legend: bool = True) -> str:
+                  include_legend: bool = True,
+                  theme: Optional[str] = None,
+                  flow_animation: Optional[bool] = None) -> str:
     """Serialise one laid-out diagram as an mxGraph document.
+
+    `theme` defaults to the one the diagram was laid out under, because node
+    sizes come from the theme too: styling a `streams` layout with `classic`
+    shapes draws label-fitted boxes at 80x80 and hides half of every name.
 
     No `modified` timestamp is written. That attribute is optional, and leaving
     it out is what lets an unchanged repository re-render byte-identically.
@@ -187,6 +162,7 @@ def render_drawio(model: GraphModel, diagram: Dict[str, Any],
     placed = diagram.get("nodes") or {}
     routed = diagram.get("edges") or []
     title = diagram.get("title") or "Topology"
+    active = get_theme(theme or diagram.get("theme"))
 
     mxfile = ET.Element("mxfile", {
         "host": "topology-cartographer",
@@ -231,7 +207,7 @@ def render_drawio(model: GraphModel, diagram: Dict[str, Any],
             "id": cell_ids[node_id],
         })
         cell = ET.SubElement(holder, "mxCell", {
-            "style": node_style(node), "vertex": "1", "parent": "1",
+            "style": node_style(node, active), "vertex": "1", "parent": "1",
         })
         ET.SubElement(cell, "mxGeometry", {
             "x": str(geometry["x"]), "y": str(geometry["y"]),
@@ -265,12 +241,16 @@ def render_drawio(model: GraphModel, diagram: Dict[str, Any],
         if edge.extractor:
             holder.set("extractor", edge.extractor)
 
-        style = edge_style(edge)
+        style = edge_style(edge, active, flow_animation)
         waypoints = entry.get("waypoints") or []
-        if not waypoints:
+        if not waypoints and active.pin_adjacent_edges:
             # Adjacent columns: pin the arrow to the facing edges of the boxes
-            # so a left-to-right diagram reads as a left-to-right flow.
-            style += "exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+            # so a left-to-right diagram reads as a left-to-right flow. Only
+            # right for rectangles - on a circle or a diamond a floating
+            # connection finds the perimeter point that faces the other node,
+            # and a pinned one leaves the arrow hanging off the bounding box.
+            style += ("exitX=1;exitY=0.5;exitDx=0;exitDy=0;"
+                      "entryX=0;entryY=0.5;entryDx=0;entryDy=0;")
         cell = ET.SubElement(holder, "mxCell", {
             "style": style, "edge": "1", "parent": "1",
             "source": source_cell, "target": target_cell,
@@ -283,25 +263,25 @@ def render_drawio(model: GraphModel, diagram: Dict[str, Any],
                               {"x": str(int(point[0])), "y": str(int(point[1]))})
 
     if include_legend:
-        _append_legend(root, diagram)
+        _append_legend(root, diagram, active)
 
     _indent(mxfile)
     return ET.tostring(mxfile, encoding="unicode") + "\n"
 
 
-def _append_legend(root: ET.Element, diagram: Dict[str, Any]) -> None:
+def _append_legend(root: ET.Element, diagram: Dict[str, Any],
+                   theme: Theme) -> None:
     cell = ET.SubElement(root, "mxCell", {
         "id": "legend",
-        "value": LEGEND_TEXT,
-        "style": ("text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;"
-                  "rounded=1;fillColor=#ffffff;strokeColor=#b3b3b3;"
-                  "fontSize=10;fontColor=#555555;"),
+        "value": legend_text(theme),
+        "style": theme.legend_style,
         "vertex": "1", "parent": "1",
     })
     ET.SubElement(cell, "mxGeometry", {
-        "x": "40",
-        "y": str(max(0, int(diagram.get("height", 600)) - 70)),
-        "width": "300", "height": "56", "as": "geometry",
+        "x": str(theme.margin_x),
+        "y": str(int(diagram.get("height", 600)) + 20),
+        "width": str(theme.legend_width),
+        "height": str(theme.legend_height), "as": "geometry",
     })
 
 
@@ -334,25 +314,6 @@ def _indent(element: ET.Element, level: int = 0) -> None:
 # Mermaid
 # --------------------------------------------------------------------------- #
 
-_MERMAID_SHAPES = {
-    KIND_SERVICE: '{0}["{1}"]',
-    KIND_TOPIC: '{0}{{{{"{1}"}}}}',
-    KIND_DATASTORE: '{0}[("{1}")]',
-    KIND_CACHE: '{0}[("{1}")]',
-    KIND_EXTERNAL_API: '{0}(["{1}"])',
-}
-
-_MERMAID_CLASSES = (
-    "  classDef service fill:#dae8fc,stroke:#6c8ebf,color:#10314f;",
-    "  classDef topic fill:#ffe6cc,stroke:#d79b00,color:#653700;",
-    "  classDef datastore fill:#d5e8d4,stroke:#82b366,color:#1f3d18;",
-    "  classDef cache fill:#e1d5e7,stroke:#9673a6,color:#3b2a45;",
-    "  classDef external_api fill:#f5f5f5,stroke:#666666,color:#333333;",
-    "  classDef referenced_only fill:none,stroke:#999999,color:#777777,"
-    "stroke-dasharray:5 5;",
-)
-
-
 def _mermaid_class(node: Node) -> str:
     attributes = dict(node.attributes)
     if node.kind == KIND_SERVICE and attributes.get("origin") == "referenced-only":
@@ -363,12 +324,17 @@ def _mermaid_class(node: Node) -> str:
 
 
 def render_mermaid(model: GraphModel, title: str = "Master topology",
-                   include_topic_labels: bool = False) -> str:
+                   include_topic_labels: bool = False,
+                   theme: Optional[str] = None) -> str:
     """A Mermaid `flowchart` carrying the same content as the .drawio file.
 
     Cheap, and it renders inline in any Markdown preview or chat surface, which
-    matters for hosts that cannot show a file from disk.
+    matters for hosts that cannot show a file from disk. The theme picks the
+    node shapes, so the two renderings of one topology stay recognisably the
+    same diagram - a topic is a circle in both, or a hexagon in both.
     """
+    active = get_theme(theme if theme is not None
+                       else (model.layout or {}).get("theme"))
     lines = [
         "%% {0}".format(title),
         "%% Generated by topology-cartographer {0} - do not edit by hand.".format(
@@ -385,7 +351,8 @@ def render_mermaid(model: GraphModel, title: str = "Master topology",
     by_kind = {}  # type: Dict[str, List[str]]
     for node_id in sorted(model.nodes):
         node = model.nodes[node_id]
-        shape = _MERMAID_SHAPES.get(node.kind, _MERMAID_SHAPES[KIND_SERVICE])
+        shape = active.mermaid_shapes.get(
+            node.kind, active.mermaid_shapes[KIND_SERVICE])
         label = _mermaid_text(node_label(node))
         lines.append("  " + shape.format(aliases[node_id], label))
         by_kind.setdefault(_mermaid_class(node), []).append(aliases[node_id])
@@ -402,7 +369,7 @@ def render_mermaid(model: GraphModel, title: str = "Master topology",
         lines.append('  {0} {1}|"{2}"| {3}'.format(source, arrow, label, target))
 
     lines.append("")
-    lines.extend(_MERMAID_CLASSES)
+    lines.extend(active.mermaid_classes)
     for kind in sorted(by_kind):
         lines.append("  class {0} {1};".format(",".join(sorted(by_kind[kind])), kind))
 

@@ -189,7 +189,17 @@ worth generating.
 ```bash
 python3 scripts/layout_graph.py service-topology/graph-model.json \
     -o service-topology/graph-model.laid-out.json
+
+# label-fitted boxes instead of the default dataflow shapes
+python3 scripts/layout_graph.py service-topology/graph-model.json \
+    --theme classic -o service-topology/graph-model.laid-out.json
 ```
+
+A theme fixes node *sizes* as well as node styles, so it is chosen here and
+stamped into the layout block; the renderers follow what is stamped. `streams`
+(the default) draws the Kafka Streams dataflow idiom - circle topic, diamond
+service, cylinder store, off-page external - and `classic` draws the
+label-fitted boxes. See `references/drawio-xml-spec.md`.
 
 Do not compute coordinates yourself, and do not adjust the ones the script
 produces. The script is the authority on placement, exactly as
@@ -219,6 +229,11 @@ python3 scripts/render_drawio.py service-topology/graph-model.laid-out.json \
 python3 scripts/render_mermaid.py service-topology/graph-model.laid-out.json \
     --mode all --output-dir service-topology
 ```
+
+Both renderers style the diagram for the theme it was laid out under. Passing
+`--theme` here overrides that and re-runs the layout, so the shapes and the
+coordinates cannot disagree. `--flow-animation` animates the arrows in draw.io -
+worth it on a small dataflow, unreadable on a large master topology.
 
 ### Phase 5 - Validation and handover
 

@@ -10,14 +10,27 @@ cannot produce a file draw.io refuses to open.
 
 What the styles mean
 --------------------
-    rounded blue box    service
-    orange hexagon      Kafka topic
-    grey dashed hexagon topic whose name is an unresolved config reference
-    green cylinder      datastore
-    purple cylinder     cache
-    grey cloud          external API
+`--theme streams` (default) - the Kafka Streams dataflow idiom. Kind is
+carried by shape, not by fill, so it stays readable at several hundred nodes
+and in either draw.io colour scheme:
+
+    circle              Kafka topic
+    dashed grey circle  topic whose name is an unresolved config reference
+    diamond             service - the processor between two topics
+    dashed grey diamond service known only because something calls it
+    cylinder            datastore (purple: cache)
+    off-page connector  external API
     solid arrow         [CODE] - read directly
     dashed grey arrow   [INFERENCE]/[UNVERIFIED] - not confirmed
+
+`--theme classic` - label-fitted boxes: blue rounded service, orange topic
+hexagon, green datastore cylinder, purple cache cylinder, grey external cloud.
+More compact for a small graph.
+
+A theme fixes node *sizes* as well as node styles, so the layout and the render
+must agree on one. `layout_graph.py` stamps its theme into the layout block and
+this script follows it; naming a different `--theme` here re-runs the layout
+under that theme rather than styling one layout with another theme's shapes.
 
 Every node and edge is emitted as a `UserObject`, so the `path/to/file:LINE`
 that justifies it travels inside the diagram: select any arrow in draw.io and
@@ -33,6 +46,7 @@ Usage
         -o service-topology/micro/orders-svc.drawio
     python3 render_drawio.py graph-model.laid-out.json --mode all \
         --output-dir service-topology
+    python3 render_drawio.py graph-model.laid-out.json --theme classic
     python3 render_drawio.py --example
 
 Open the result directly in VS Code, Cursor, or Antigravity with the
@@ -64,6 +78,7 @@ from topology_lib.model import (  # noqa: E402
     user_path,
 )
 from topology_lib.render import render_drawio  # noqa: E402
+from topology_lib.theme import THEME_NAMES  # noqa: E402
 from topology_lib.textutil import safe_filename  # noqa: E402
 
 EXAMPLE = """\
@@ -79,17 +94,18 @@ pageWidth="1169" pageHeight="826" math="0" shadow="0">
         <UserObject label="orders-svc" tooltip="services/orders/go.mod:1" \
 topologyKind="service" topologyId="orders-svc" \
 sourceEvidence="services/orders/go.mod:1" id="node-0">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;\
-strokeColor=#6c8ebf;" vertex="1" parent="1">
-            <mxGeometry x="40" y="40" width="160" height="50" as="geometry" />
+          <mxCell style="rhombus;whiteSpace=wrap;html=1;fontSize=11;\
+fontStyle=1;verticalAlign=middle;align=center;" vertex="1" parent="1">
+            <mxGeometry x="60" y="60" width="120" height="115" as="geometry" />
           </mxCell>
         </UserObject>
         <UserObject label="key=order_id" \
 tooltip="services/orders/kafka/producer.go:42" evidenceTag="CODE" \
 sourceLocation="services/orders/kafka/producer.go:42" edgeType="produces" \
 id="edge-0">
-          <mxCell style="edgeStyle=orthogonalEdgeStyle;html=1;\
-strokeColor=#d79b00;" edge="1" parent="1" source="node-0" target="node-1">
+          <mxCell style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;\
+fontSize=9;strokeColor=#d79b00;" edge="1" parent="1" source="node-0" \
+target="node-1">
             <mxGeometry relative="1" as="geometry" />
           </mxCell>
         </UserObject>
@@ -121,6 +137,15 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--output-root", default="service-topology",
         help="containment root; nothing is written outside it")
     parser.add_argument(
+        "--theme", choices=THEME_NAMES, default=None,
+        help="shape vocabulary; defaults to the theme the model was laid out "
+             "under. Naming one that differs re-runs the layout, because a "
+             "theme fixes node sizes as well as node styles")
+    parser.add_argument(
+        "--flow-animation", action="store_true",
+        help="animate the arrows in draw.io (marching ants). Good on a small "
+             "dataflow, unreadable on a large master topology")
+    parser.add_argument(
         "--no-legend", action="store_true",
         help="omit the evidence legend box from the diagram")
     parser.add_argument(
@@ -129,14 +154,24 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def ensure_layout(model: GraphModel) -> Dict[str, Any]:
-    if not model.layout or not model.layout.get("diagrams"):
-        model.layout = layout_all(model)
+def ensure_layout(model: GraphModel, theme: Optional[str] = None) -> Dict[str, Any]:
+    """The diagrams to render, laid out under `theme` if one was named.
+
+    Re-running the layout when the requested theme differs from the stored one
+    is the whole point: node sizes come from the theme, so styling a `classic`
+    layout with `streams` shapes would draw 80x80 circles at coordinates
+    reserved for 280-wide boxes and leave the columns full of holes.
+    """
+    stored = model.layout.get("theme") if model.layout else None
+    if (not model.layout or not model.layout.get("diagrams")
+            or (theme is not None and theme != stored)):
+        model.layout = layout_all(model, theme=theme)
     return model.layout["diagrams"]
 
 
 def render_one(model: GraphModel, diagrams: Dict[str, Any], key: str,
-               no_legend: bool) -> Optional[str]:
+               no_legend: bool, theme: Optional[str] = None,
+               flow_animation: bool = False) -> Optional[str]:
     diagram = diagrams.get(key)
     if diagram is None:
         return None
@@ -149,7 +184,9 @@ def render_one(model: GraphModel, diagrams: Dict[str, Any], key: str,
         target_model = model
     return render_drawio(target_model, diagram,
                          include_topic_labels=bool(focus),
-                         include_legend=not no_legend)
+                         include_legend=not no_legend,
+                         theme=theme,
+                         flow_animation=flow_animation or None)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -173,14 +210,15 @@ def main(argv: Optional[List[str]] = None) -> int:
               file=sys.stderr)
         return 1
 
-    diagrams = ensure_layout(model)
+    diagrams = ensure_layout(model, args.theme)
     writer = SafeWriter(user_path(args.output_root))
 
     try:
         if args.mode == "all":
             written = 0
             for key in sorted(diagrams):
-                xml = render_one(model, diagrams, key, args.no_legend)
+                xml = render_one(model, diagrams, key, args.no_legend,
+                                 args.theme, args.flow_animation)
                 if xml is None:
                     continue
                 if key == "master":
@@ -213,7 +251,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             key = "master"
             default_name = "master-topology.drawio"
 
-        xml = render_one(model, diagrams, key, args.no_legend)
+        xml = render_one(model, diagrams, key, args.no_legend,
+                         args.theme, args.flow_animation)
         if xml is None:
             print("error: the model has no {0} diagram".format(key), file=sys.stderr)
             return 2

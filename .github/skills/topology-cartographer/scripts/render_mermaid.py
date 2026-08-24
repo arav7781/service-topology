@@ -47,6 +47,7 @@ from topology_lib.model import (  # noqa: E402
     user_path,
 )
 from topology_lib.render import render_mermaid  # noqa: E402
+from topology_lib.theme import THEME_NAMES  # noqa: E402
 from topology_lib.textutil import safe_filename  # noqa: E402
 
 EXAMPLE = """\
@@ -94,6 +95,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--output-root", default="service-topology",
         help="containment root; nothing is written outside it")
     parser.add_argument(
+        "--theme", choices=THEME_NAMES, default=None,
+        help="node shapes; defaults to the theme the model was laid out "
+             "under, so the .mmd and the .drawio read as one diagram")
+    parser.add_argument(
         "--fenced", action="store_true",
         help="wrap the output in a ```mermaid fence, ready to paste into chat")
     parser.add_argument(
@@ -140,9 +145,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 1
 
     writer = SafeWriter(user_path(args.output_root))
+    # A subgraph is a fresh model with no layout block of its own, so the
+    # theme is resolved once here and passed down rather than re-read per call.
+    theme = args.theme or model.layout.get("theme")
+
     try:
         if args.mode == "all":
-            master = render_mermaid(model, "Master topology")
+            master = render_mermaid(model, "Master topology", theme=theme)
             target = writer.write_text(
                 user_path(str(Path(args.output_dir) / "master-topology.mmd")),
                 fence(master, args.fenced))
@@ -151,7 +160,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 text = render_mermaid(
                     subgraph_for_service(model, service_id),
                     "Micro topology - {0}".format(model.services[service_id].display),
-                    include_topic_labels=True)
+                    include_topic_labels=True, theme=theme)
                 relative = "micro/{0}.mmd".format(safe_filename(service_id))
                 target = writer.write_text(
                     user_path(str(Path(args.output_dir) / relative)), fence(text, args.fenced))
@@ -170,9 +179,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             text = render_mermaid(
                 subgraph_for_service(model, args.service),
                 "Micro topology - {0}".format(model.services[args.service].display),
-                include_topic_labels=True)
+                include_topic_labels=True, theme=theme)
         else:
-            text = render_mermaid(model, "Master topology")
+            text = render_mermaid(model, "Master topology", theme=theme)
 
         payload = fence(text, args.fenced)
         if args.output:

@@ -18,8 +18,8 @@ Tools
 -----
     scan_repository(path, scope?, output_dir?)
     list_detected_services(graph_model_path)
-    generate_master_topology(graph_model_path, output_dir?)
-    generate_micro_topology(graph_model_path, service_name, output_dir?)
+    generate_master_topology(graph_model_path, output_dir?, theme?)
+    generate_micro_topology(graph_model_path, service_name, output_dir?, theme?)
 
 Safety
 ------
@@ -59,6 +59,7 @@ from topology_lib.model import (  # noqa: E402
     validate,
 )
 from topology_lib.render import render_drawio, render_evidence, render_mermaid  # noqa: E402
+from topology_lib.theme import DEFAULT_THEME, THEME_NAMES  # noqa: E402
 from topology_lib.textutil import safe_filename  # noqa: E402
 
 SERVER_NAME = "topology-cartographer"
@@ -162,6 +163,19 @@ TOOLS = [
                         "model is in."
                     ),
                 },
+                "theme": {
+                    "type": "string",
+                    "enum": list(THEME_NAMES),
+                    "description": (
+                        "Shape vocabulary. \"streams\" (default) is the Kafka "
+                        "Streams dataflow idiom - circle topic, diamond "
+                        "service, cylinder store, off-page external - and "
+                        "carries kind by shape rather than fill, so it stays "
+                        "readable at several hundred nodes. \"classic\" draws "
+                        "label-fitted boxes, which is more compact for a small "
+                        "graph."
+                    ),
+                },
             },
             "required": ["graph_model_path"],
         },
@@ -195,6 +209,19 @@ TOOLS = [
                         "model is in."
                     ),
                 },
+                "theme": {
+                    "type": "string",
+                    "enum": list(THEME_NAMES),
+                    "description": (
+                        "Shape vocabulary. \"streams\" (default) is the Kafka "
+                        "Streams dataflow idiom - circle topic, diamond "
+                        "service, cylinder store, off-page external - and "
+                        "carries kind by shape rather than fill, so it stays "
+                        "readable at several hundred nodes. \"classic\" draws "
+                        "label-fitted boxes, which is more compact for a small "
+                        "graph."
+                    ),
+                },
             },
             "required": ["graph_model_path", "service_name"],
         },
@@ -218,6 +245,20 @@ def _load_model(path: str) -> GraphModel:
         return GraphModel.load(str(resolved))
     except ValueError as error:
         raise ToolError("{0} is not a valid graph model: {1}".format(path, error))
+
+
+def _theme(arguments: Dict[str, Any]) -> str:
+    """The requested theme, rejecting an unknown name rather than guessing.
+
+    The CLIs get this from `argparse` `choices`; an MCP client can send
+    anything, and silently drawing the default when a caller asked for
+    something else is the kind of quiet substitution that wastes an hour.
+    """
+    name = arguments.get("theme") or DEFAULT_THEME
+    if name not in THEME_NAMES:
+        raise ToolError("unknown theme {0!r}. Known themes: {1}".format(
+            name, ", ".join(THEME_NAMES)))
+    return str(name)
 
 
 def _output_root(model_path: str, output_dir: Optional[str]) -> Path:
@@ -347,13 +388,16 @@ def tool_generate_master_topology(arguments: Dict[str, Any]) -> Dict[str, Any]:
     if not model.nodes:
         raise ToolError("this graph model has no nodes to draw")
 
+    theme = _theme(arguments)
     root = _output_root(model_path, arguments.get("output_dir"))
     writer = SafeWriter(str(root))
-    diagram = layout_diagram(model, "Master topology")
+    diagram = layout_diagram(model, "Master topology", theme=theme)
 
-    drawio = writer.write_text("master-topology.drawio", render_drawio(model, diagram))
+    drawio = writer.write_text("master-topology.drawio",
+                               render_drawio(model, diagram, theme=theme))
     mermaid = writer.write_text("master-topology.mmd",
-                                render_mermaid(model, "Master topology"))
+                                render_mermaid(model, "Master topology",
+                                               theme=theme))
 
     inferred = model.inferred_edges()
     text = [
@@ -391,19 +435,20 @@ def tool_generate_micro_topology(arguments: Dict[str, Any]) -> Dict[str, Any]:
             "no service {0!r} in this model. Known services: {1}".format(
                 service, ", ".join(sorted(model.services)) or "(none)"))
 
+    theme = _theme(arguments)
     subgraph = subgraph_for_service(model, service)
     title = "Micro topology - {0}".format(model.services[service].display)
-    diagram = layout_diagram(subgraph, title, focus=service)
+    diagram = layout_diagram(subgraph, title, focus=service, theme=theme)
 
     root = _output_root(model_path, arguments.get("output_dir"))
     writer = SafeWriter(str(root))
     name = safe_filename(service)
     drawio = writer.write_text(
         "micro/{0}.drawio".format(name),
-        render_drawio(subgraph, diagram, include_topic_labels=True))
+        render_drawio(subgraph, diagram, include_topic_labels=True, theme=theme))
     mermaid = writer.write_text(
         "micro/{0}.mmd".format(name),
-        render_mermaid(subgraph, title, include_topic_labels=True))
+        render_mermaid(subgraph, title, include_topic_labels=True, theme=theme))
 
     inbound = [e for e in subgraph.edges if e.dst == service]
     outbound = [e for e in subgraph.edges if e.src == service]

@@ -20,12 +20,19 @@ Algorithm
 4. Place: layer -> x, position -> y, then centre each column vertically.
 5. Route: straight for adjacent layers, a jog for longer spans, and a channel
    below the diagram for back edges.
+
+How big a node is, and how much air a column needs, come from the theme rather
+than from constants here - `streams` draws fixed-size circles and diamonds and
+needs wide columns for the names that overhang them, `classic` fits a box to
+its label and does not. The theme name is stamped into the layout block so the
+renderers style what was actually laid out.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
+from .theme import Theme, get_theme
 from .model import (
     EDGE_CONSUMES,
     EDGE_PRODUCES,
@@ -38,7 +45,9 @@ from .model import (
 
 LAYOUT_VERSION = "1.0.0"
 
-# Geometry, in mxGraph units (1 unit == 1 pixel at 100% zoom).
+# Geometry, in mxGraph units (1 unit == 1 pixel at 100% zoom). These size a
+# box around its label, which is what a theme without fixed node sizes asks
+# for; the fixed sizes and the column spacing live on the theme itself.
 MIN_WIDTH = 160
 MAX_WIDTH = 280
 MIN_HEIGHT = 50
@@ -47,12 +56,6 @@ LINE_HEIGHT = 18
 PADDING_X = 28
 PADDING_Y = 26
 
-COLUMN_GAP = 120
-ROW_GAP = 40
-MARGIN_X = 40
-MARGIN_Y = 40
-BACK_EDGE_CHANNEL = 60
-
 BARYCENTRE_SWEEPS = 4
 
 
@@ -60,8 +63,18 @@ BARYCENTRE_SWEEPS = 4
 # Node geometry
 # --------------------------------------------------------------------------- #
 
-def node_size(node: Node) -> Tuple[int, int]:
-    """Size a box around its label, clamped so one long name cannot dominate."""
+def node_size(node: Node, theme: Optional[Theme] = None) -> Tuple[int, int]:
+    """How big this node is drawn.
+
+    A theme with fixed sizes wins outright: in the `streams` idiom a topic is
+    an 80-unit circle whatever its name is, and a name that overhangs it is the
+    look, not a bug - which is why that theme also asks for wide columns. With
+    no fixed size the box is fitted to the label, clamped so one long name
+    cannot dominate the diagram.
+    """
+    fixed = (theme if theme is not None else get_theme(None)).node_size(node.kind)
+    if fixed is not None:
+        return fixed
     lines = (node.display or node.id).split("\n")
     longest = max(len(line) for line in lines) if lines else len(node.id)
     width = min(MAX_WIDTH, max(MIN_WIDTH, longest * CHAR_WIDTH + PADDING_X))
@@ -232,31 +245,32 @@ def _order_within_layers(model: GraphModel, layer: Dict[str, int],
 # Placement and routing
 # --------------------------------------------------------------------------- #
 
-def _place(model: GraphModel, layer: Dict[str, int], position: Dict[str, int]
-           ) -> Tuple[Dict[str, Dict[str, int]], int, int]:
+def _place(model: GraphModel, layer: Dict[str, int], position: Dict[str, int],
+           theme: Theme) -> Tuple[Dict[str, Dict[str, int]], int, int]:
     columns = {}  # type: Dict[int, List[str]]
     for node_id in sorted(model.nodes, key=lambda n: (layer[n], position[n], n)):
         columns.setdefault(layer[node_id], []).append(node_id)
 
-    sizes = dict((node_id, node_size(node)) for node_id, node in model.nodes.items())
+    sizes = dict((node_id, node_size(node, theme))
+                 for node_id, node in model.nodes.items())
 
     column_x = {}  # type: Dict[int, int]
-    cursor = MARGIN_X
+    cursor = theme.margin_x
     for index in sorted(columns):
         width = max(sizes[node_id][0] for node_id in columns[index])
         column_x[index] = cursor
-        cursor += width + COLUMN_GAP
+        cursor += width + theme.column_gap
 
     column_height = {}  # type: Dict[int, int]
     for index in sorted(columns):
         total = sum(sizes[node_id][1] for node_id in columns[index])
-        column_height[index] = total + ROW_GAP * max(0, len(columns[index]) - 1)
+        column_height[index] = total + theme.row_gap * max(0, len(columns[index]) - 1)
     tallest = max(column_height.values()) if column_height else 0
 
     placed = {}  # type: Dict[str, Dict[str, int]]
     for index in sorted(columns):
         column_width = max(sizes[node_id][0] for node_id in columns[index])
-        y = MARGIN_Y + (tallest - column_height[index]) // 2
+        y = theme.margin_y + (tallest - column_height[index]) // 2
         for node_id in columns[index]:
             width, height = sizes[node_id]
             placed[node_id] = {
@@ -268,18 +282,19 @@ def _place(model: GraphModel, layer: Dict[str, int], position: Dict[str, int]
                 "layer": index,
                 "order": columns[index].index(node_id),
             }
-            y += height + ROW_GAP
+            y += height + theme.row_gap
 
-    total_width = cursor - COLUMN_GAP + MARGIN_X if columns else 2 * MARGIN_X
-    total_height = tallest + 2 * MARGIN_Y
+    total_width = (cursor - theme.column_gap + theme.margin_x
+                   if columns else 2 * theme.margin_x)
+    total_height = tallest + 2 * theme.margin_y
     return placed, total_width, total_height
 
 
 def _route(model: GraphModel, placed: Dict[str, Dict[str, int]],
-           total_height: int) -> List[Dict[str, Any]]:
+           total_height: int, theme: Theme) -> List[Dict[str, Any]]:
     """Waypoints per edge, indexed against `model.edges`."""
     routed = []  # type: List[Dict[str, Any]]
-    channel = total_height - BACK_EDGE_CHANNEL // 2
+    channel = total_height - theme.back_edge_channel // 2
     back_lane = 0
 
     for index, edge in enumerate(model.edges):
@@ -299,7 +314,7 @@ def _route(model: GraphModel, placed: Dict[str, Dict[str, int]],
             # A back edge, or two nodes in the same column: drop below the
             # diagram so the arrow never runs backwards through a box.
             back_lane += 1
-            lane_y = channel + (back_lane % 3) * 24
+            lane_y = channel + (back_lane % 3) * (theme.row_gap // 2)
             entry["waypoints"] = [
                 [source["x"] + source["width"] // 2, lane_y],
                 [target["x"] + target["width"] // 2, lane_y],
@@ -319,11 +334,13 @@ def _route(model: GraphModel, placed: Dict[str, Dict[str, int]],
 # --------------------------------------------------------------------------- #
 
 def layout_diagram(model: GraphModel, title: str,
-                   focus: Optional[str] = None) -> Dict[str, Any]:
+                   focus: Optional[str] = None,
+                   theme: Optional[str] = None) -> Dict[str, Any]:
     """Lay out one diagram. Same model in, same coordinates out, always."""
+    active = get_theme(theme)
     if not model.nodes:
         return {"title": title, "focus": focus, "width": 400, "height": 200,
-                "nodes": {}, "edges": [], "edge_count": 0}
+                "theme": active.name, "nodes": {}, "edges": [], "edge_count": 0}
 
     successors, predecessors = _adjacency(model)
     if focus is not None and focus in model.nodes:
@@ -332,25 +349,29 @@ def layout_diagram(model: GraphModel, title: str,
         layer = _layers(model, successors, predecessors, _back_edges(successors))
 
     position = _order_within_layers(model, layer, successors, predecessors)
-    placed, width, height = _place(model, layer, position)
-    edges = _route(model, placed, height)
+    placed, width, height = _place(model, layer, position, active)
+    edges = _route(model, placed, height, active)
 
     return {
         "title": title,
         "focus": focus,
         "width": width,
-        "height": height + BACK_EDGE_CHANNEL,
+        "height": height + active.back_edge_channel,
+        # Stamped so a renderer handed only the laid-out model styles it for
+        # the sizes it was actually placed at.
+        "theme": active.name,
         "nodes": placed,
         "edges": edges,
         "edge_count": len(model.edges),
     }
 
 
-def layout_all(model: GraphModel, services: Optional[Sequence[str]] = None
-               ) -> Dict[str, Any]:
+def layout_all(model: GraphModel, services: Optional[Sequence[str]] = None,
+               theme: Optional[str] = None) -> Dict[str, Any]:
     """Lay out the master topology and one micro topology per service."""
+    active = get_theme(theme)
     diagrams = {
-        "master": layout_diagram(model, "Master topology"),
+        "master": layout_diagram(model, "Master topology", theme=active.name),
     }  # type: Dict[str, Any]
 
     if services is not None:
@@ -369,6 +390,8 @@ def layout_all(model: GraphModel, services: Optional[Sequence[str]] = None
             subgraph,
             "Micro topology - {0}".format(model.services[service_id].display),
             focus=service_id,
+            theme=active.name,
         )
 
-    return {"layout_version": LAYOUT_VERSION, "diagrams": diagrams}
+    return {"layout_version": LAYOUT_VERSION, "theme": active.name,
+            "diagrams": diagrams}

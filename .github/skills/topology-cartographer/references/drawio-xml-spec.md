@@ -69,21 +69,52 @@ and `target` reference those ids.
 
 ## Styles
 
-Node styles, all core mxGraph shapes - nothing here needs a shape library:
+Every style comes from `scripts/topology_lib/theme.py`, never from a literal in
+the renderer. Two themes ship, chosen with `--theme` on `layout_graph.py` and
+`render_drawio.py`. All shapes in both are core mxGraph - nothing needs a shape
+library.
 
-| Kind | Style | Reads as |
-|---|---|---|
-| service | `rounded=1` blue | a deployable |
-| service, referenced-only | `rounded=1;dashed=1;fillColor=none` grey | something we only know is called |
-| topic | `shape=hexagon` orange | a Kafka topic |
-| topic, unresolved name | `shape=hexagon;dashed=1;fillColor=none` grey | a config key we could not resolve |
-| datastore | `shape=cylinder3` green | a database |
-| cache | `shape=cylinder3` purple | a cache |
-| external API | `shape=cloud` grey | something outside the system |
+### `streams` (default)
 
-A topic is a hexagon rather than the more conventional horizontal cylinder
-precisely because datastores are cylinders here. Two shapes that differ only by
-rotation are two shapes a reader has to think about.
+The Kafka Streams dataflow idiom: **kind is carried by shape, not by fill.** At
+three hundred nodes a reader stops distinguishing seven pastel fills and never
+stops distinguishing a circle from a diamond, and leaving fill unset means the
+diagram follows draw.io's own light/dark setting instead of being a white
+rectangle on a dark canvas.
+
+| Kind | Style | Drawn at | Reads as |
+|---|---|---|---|
+| topic | `ellipse;aspect=fixed` | 80x80 | a Kafka topic |
+| topic, unresolved name | `ellipse;dashed=1;fillColor=none` grey | 80x80 | a config key we could not resolve |
+| service | `rhombus` | 120x115 | the processor between two topics |
+| service, referenced-only | `rhombus;dashed=1;fillColor=none` grey | 120x115 | something we only know is called |
+| datastore | `shape=cylinder3;size=15` | 110x95 | a database |
+| cache | `shape=cylinder3;size=15` purple | 110x95 | a cache |
+| external API | `shape=offPageConnector` | 80x80 | the flow continues outside this diagram |
+
+Cache is the one place this theme spends colour, because a cache and a database
+are both cylinders and nothing but fill can separate them.
+
+Shapes are fixed-size and small, so a long topic name overhangs its circle -
+that is the idiom, not a defect, and it is why this theme also asks for a
+240-unit column gap. Topic labels are set in a monospace stack, which is what
+makes `orders.created.v2` and `orders_created_v2` distinguishable at 9px.
+
+Edges carry no `edgeStyle`, so draw.io draws the direct line between two
+perimeter points rather than an elbow, and adjacent-column arrows are *not*
+pinned with `exitX`/`entryX`: on a circle or a diamond a floating connection
+finds the perimeter point that actually faces the other node, where a pinned one
+leaves the arrow hanging off the bounding box.
+
+### `classic`
+
+The label-fitted boxes this skill emitted before themes existed - blue rounded
+service, orange topic hexagon, green datastore cylinder, purple cache cylinder,
+grey external cloud, orthogonal elbow edges pinned to the facing sides. More
+compact for a small graph, and still selectable so that upgrading this skill
+does not silently redraw an existing pipeline's output.
+
+### Both themes
 
 Edge colours carry the relationship, and the dash carries the evidence:
 
@@ -95,6 +126,19 @@ Edge colours carry the relationship, and the dash carries the evidence:
 | `calls`, grpc | purple |
 | `depends_on` | grey |
 | anything not `[CODE]` | overridden to dashed grey, whatever its type |
+
+### A theme fixes sizes, not just styles
+
+`streams` draws a topic at 80x80 whatever its name is; `classic` fits the box to
+the label and can reach 280 wide. So the layout and the render must agree on one
+theme, or boxes are placed for sizes they were never drawn at. `layout_all`
+stamps its theme name into the layout block, the renderers default to whatever
+is stamped there, and passing a different `--theme` to `render_drawio.py`
+re-runs the layout rather than styling one layout with another theme's shapes.
+
+`--flow-animation` adds draw.io's marching-ants `flowAnimation=1` to every edge.
+Good on a twenty-node dataflow, unreadable on a large master topology, so it is
+off unless asked for.
 
 ---
 
@@ -132,9 +176,13 @@ Routed edges carry explicit points:
 </mxGeometry>
 ```
 
-Edges between adjacent columns carry none, and instead pin their exit and entry
-to the facing sides of the boxes (`exitX=1`, `entryX=0`), which is what makes a
-left-to-right diagram read as left-to-right flow.
+Edges between adjacent columns carry none. Under `classic` they instead pin
+their exit and entry to the facing sides of the boxes (`exitX=1`, `entryX=0`),
+which is what makes a left-to-right diagram of rectangles read as left-to-right
+flow. Under `streams` they are left floating, because a pin computed for a
+bounding box leaves the arrow hanging in the corner of a circle or a diamond
+while a floating connection lands on the perimeter point that faces the other
+node.
 
 ---
 

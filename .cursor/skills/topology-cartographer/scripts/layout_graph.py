@@ -39,6 +39,7 @@ from typing import Any, Dict, List, Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from topology_lib.layout import LAYOUT_VERSION, layout_all  # noqa: E402
+from topology_lib.theme import DEFAULT_THEME, THEME_NAMES  # noqa: E402
 from topology_lib.model import (  # noqa: E402
     GraphModel,
     OutsideOutputRoot,
@@ -89,6 +90,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="lay out micro topologies for these services only; repeatable "
              "(default: every service)")
     parser.add_argument(
+        "--theme", choices=THEME_NAMES, default=DEFAULT_THEME,
+        help="shape and spacing vocabulary; a theme fixes node sizes, so it "
+             "is chosen here and stamped into the layout block for the "
+             "renderers to follow (default: {0})".format(DEFAULT_THEME))
+    parser.add_argument(
         "--format", choices=("json", "summary"), default="json",
         help="json (default) or a short per-diagram summary")
     parser.add_argument(
@@ -138,7 +144,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         print("error: the model has no nodes to lay out", file=sys.stderr)
         return 2
 
-    model.layout = layout_all(model, args.service or None)
+    model.layout = layout_all(model, args.service or None, theme=args.theme)
 
     if args.format == "summary":
         payload = summarise(model.layout) + "\n"
@@ -152,8 +158,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         except OutsideOutputRoot as error:
             print("error: {0}".format(error), file=sys.stderr)
             return 1
-        print("wrote {0} ({1} diagram(s))".format(
-            target, len(model.layout["diagrams"])))
+        print("wrote {0} ({1} diagram(s), {2} theme)".format(
+            target, len(model.layout["diagrams"]), args.theme))
     else:
         sys.stdout.write(payload)
     return 0

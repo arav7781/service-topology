@@ -122,14 +122,16 @@ Added by `layout_graph.py`; consumed by `render_drawio.py`.
 ```json
 {
   "layout_version": "1.0.0",
+  "theme": "streams",
   "diagrams": {
     "master": {
       "title": "Master topology",
       "focus": null,
-      "width": 1376,
-      "height": 442,
+      "theme": "streams",
+      "width": 1630,
+      "height": 705,
       "nodes": {
-        "orders-svc": {"x": 40, "y": 40, "width": 160, "height": 50,
+        "orders-svc": {"x": 420, "y": 450, "width": 120, "height": 115,
                        "layer": 0, "order": 0}
       },
       "edges": [{"index": 0, "from": "orders-svc", "to": "orders.created",
@@ -145,6 +147,11 @@ Added by `layout_graph.py`; consumed by `render_drawio.py`.
 micro diagram, that list is the deterministic subgraph for `focus`, so the
 renderer recomputes it and the indices line up. `edge_count` exists so a
 mismatch is caught rather than rendered as a wrong arrow.
+
+`theme` is stamped at both levels because a theme fixes node *sizes* as well as
+node styles - the `width` and `height` above are the ones `streams` draws a
+service at. A renderer handed only this file styles it for the theme it was laid
+out under; see `references/drawio-xml-spec.md`.
 
 ---
 

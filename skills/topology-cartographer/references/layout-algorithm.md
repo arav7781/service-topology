@@ -59,16 +59,26 @@ interleaved with services in the same column.
 
 ### 4. Place
 
-Layer index becomes a column, position within the layer becomes a row. Each box
-is sized around its label - eight units per character, clamped to 160-280 wide -
-and each column is centred vertically against the tallest column, so the arrows
-between adjacent columns run roughly horizontal.
+Layer index becomes a column, position within the layer becomes a row. Each
+column is centred vertically against the tallest column, so the arrows between
+adjacent columns run roughly horizontal.
+
+Node size and column spacing come from the theme, not from this module. Under
+`streams` (the default) every node has a fixed size per kind - an 80x80 circle
+for a topic whatever its name is - and the columns are spaced 240 units apart so
+a name that overhangs its circle still clears the next column. Under `classic`
+there are no fixed sizes, so each box is fitted to its label at eight units per
+character, clamped to 160-280 wide, in 120-unit columns.
+
+This is why the theme is chosen at layout time and stamped into the layout
+block: a renderer that styled these coordinates with the other theme's shapes
+would draw every node at the wrong size.
 
 ### 5. Route
 
 | Span | Route |
 |---|---|
-| One layer | Straight, pinned to the right edge of the source and the left edge of the target |
+| One layer | Straight. Under `classic`, pinned to the right edge of the source and the left edge of the target; under `streams` left floating, so the line lands on the perimeter point of a circle or a diamond rather than its bounding box |
 | More than one layer | A jog at the horizontal midpoint, so the arrow does not clip the columns it flies over |
 | Zero or negative (a back edge) | Down into a channel below the diagram, across, and back up. Three lanes, rotating, so parallel back edges do not overlap |
 
