@@ -28,12 +28,18 @@ gaps - never a diagram, and never a conclusion about the system as a whole.
 
 ## Method
 
-1. **Run the scan** over your assigned scope:
+1. **Run the scan** over your assigned scope. Resolve the script path from the
+   plugin root - never search the filesystem for it, and never assume it is
+   under the working directory (the working directory is the *analysed*
+   repository):
 
    ```bash
-   python3 skills/topology-cartographer/scripts/scan_repository.py <repo> \
-       --scope <your subtree> -o <shard>.json
+   S="${CLAUDE_PLUGIN_ROOT:-.}/skills/topology-cartographer/scripts"
+   python3 $S/scan_repository.py <repo> --scope <your subtree> -o <shard>.json
    ```
+
+   If the orchestrator gave you an explicit script path, use that and skip the
+   resolution entirely. One scan call, then read - do not re-run it per file.
 
 2. **Check the service list first.** If the scope produced no services, or split
    one deployable into several, stop and say so - every edge below it inherits

@@ -74,7 +74,7 @@ You **MAY**:
 - read configuration - `application.yml`, `.properties`, `.env`,
   docker-compose, Helm values, Terraform - to resolve a topic name or a base URL;
 - run the bundled scripts in `scripts/`;
-- delegate per-directory extraction to the `topology-extractor` subagent;
+- delegate per-directory extraction to the `topology-extractor` custom agent;
 - write diagrams, the graph model, and the evidence report under the output
   directory;
 - ask the user which service boundary is correct when the repository is
@@ -126,11 +126,24 @@ Track phases with a todo list. Do not skip phases. Do not reorder them.
 
 Read `references/service-boundary-heuristics.md`.
 
-Establish what counts as a service in this repository before extracting
-anything. Run:
+**Resolve the script path once, before anything else.** Every command below is
+written `$S/<script>.py`. Set `$S` in your first Bash call and reuse it - do
+**not** search the filesystem for these scripts, and do not assume they are
+under the current directory. The analysed repository is the working directory;
+the scripts live with the skill:
 
 ```bash
-python3 scripts/scan_repository.py <repo> --format summary
+S="${CLAUDE_PLUGIN_ROOT:-.}/skills/topology-cartographer/scripts"
+[ -f "$S/scan_repository.py" ] || S="$(dirname "$(find / -name scan_repository.py -path '*topology-cartographer*' -print -quit 2>/dev/null)")"
+echo "$S"
+```
+
+If `CLAUDE_PLUGIN_ROOT` is set (it is, whenever this runs as an installed
+plugin) the first line is enough and the second never runs. Establish what
+counts as a service before extracting anything:
+
+```bash
+python3 $S/scan_repository.py <repo> --format summary
 ```
 
 Check the service list against the repository's own structure. A monorepo with
@@ -154,12 +167,19 @@ Read `references/kafka-extraction-playbook.md` and
 `references/sync-call-extraction-playbook.md`.
 
 ```bash
-python3 scripts/scan_repository.py <repo> [--scope path,...] -o scan.json
+python3 $S/scan_repository.py <repo> [--scope path,...] -o scan.json
 ```
 
-For a large monorepo, delegate to the `topology-extractor` custom agent once per
-subtree and merge the shards in Phase 2. That keeps a 3,000-file repository from
-filling the context window with source you only needed to grep.
+**Do not delegate by default.** The scanner is a single Python process doing
+regular expressions over files - a 2,600-file monorepo completes in about
+fifteen seconds, and one `--scope`-less run over the whole repository is almost
+always the right first move. Spawning a subagent per service costs minutes and
+tens of thousands of tokens to produce what one command already produced.
+
+Delegate to the `topology-extractor` custom agent **only** when a single scan is
+genuinely insufficient: the repository is very large *and* you need a human
+judgement per subtree about what the scan missed. Even then, one subagent per
+*group* of services, never one per service.
 
 Confirm the scan found what the repository's own documentation implies it should.
 A service with a `KafkaTemplate` on its classpath and no `produces` edge is a
@@ -169,7 +189,7 @@ silently.
 ### Phase 2 - Graph model
 
 ```bash
-python3 scripts/build_graph_model.py --input scan.json \
+python3 $S/build_graph_model.py --input scan.json \
     -o service-topology/graph-model.json \
     --evidence-out service-topology/evidence/sources.md
 ```
@@ -185,11 +205,11 @@ worth generating.
 ### Phase 3 - Layout
 
 ```bash
-python3 scripts/layout_graph.py service-topology/graph-model.json \
+python3 $S/layout_graph.py service-topology/graph-model.json \
     -o service-topology/graph-model.laid-out.json
 
 # label-fitted boxes instead of the default dataflow shapes
-python3 scripts/layout_graph.py service-topology/graph-model.json \
+python3 $S/layout_graph.py service-topology/graph-model.json \
     --theme classic -o service-topology/graph-model.laid-out.json
 ```
 
@@ -211,20 +231,20 @@ not use it to write XML yourself.
 
 ```bash
 # master
-python3 scripts/render_drawio.py service-topology/graph-model.laid-out.json \
+python3 $S/render_drawio.py service-topology/graph-model.laid-out.json \
     --mode master -o service-topology/master-topology.drawio
-python3 scripts/render_mermaid.py service-topology/graph-model.laid-out.json \
+python3 $S/render_mermaid.py service-topology/graph-model.laid-out.json \
     -o service-topology/master-topology.mmd
 
 # one service
-python3 scripts/render_drawio.py service-topology/graph-model.laid-out.json \
+python3 $S/render_drawio.py service-topology/graph-model.laid-out.json \
     --mode micro --service <name> \
     -o service-topology/micro/<name>.drawio
 
 # everything
-python3 scripts/render_drawio.py service-topology/graph-model.laid-out.json \
+python3 $S/render_drawio.py service-topology/graph-model.laid-out.json \
     --mode all --output-dir service-topology
-python3 scripts/render_mermaid.py service-topology/graph-model.laid-out.json \
+python3 $S/render_mermaid.py service-topology/graph-model.laid-out.json \
     --mode all --output-dir service-topology
 ```
 
@@ -236,7 +256,7 @@ worth it on a small dataflow, unreadable on a large master topology.
 ### Phase 5 - Validation and handover
 
 ```bash
-python3 scripts/validate_graph_model.py service-topology/graph-model.json \
+python3 $S/validate_graph_model.py service-topology/graph-model.json \
     --repo <repo>
 ```
 

@@ -28,7 +28,7 @@ Assume the diagram is wrong and try to prove it.
 ### 1. Model integrity
 
 ```bash
-python3 skills/topology-cartographer/scripts/validate_graph_model.py \
+python3 "${CLAUDE_PLUGIN_ROOT:-.}/skills/topology-cartographer/scripts/validate_graph_model.py" \
     service-topology/graph-model.json --repo <repo> --format json
 ```
 

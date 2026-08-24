@@ -63,6 +63,9 @@ IMAGE_KINDS = (
 
 _KEY_LINE = re.compile(r"^(?P<key>[^:#\-\s][^:#]*?)\s*:\s*(?P<value>.*)$")
 
+# `refundCallbackProcessorTopic` -> `REFUND_CALLBACK_PROCESSOR_TOPIC`
+_CAMEL_TO_SNAKE = re.compile(r"([a-z0-9])([A-Z])")
+
 
 def _scalar(text: str) -> Any:
     text = text.strip()
@@ -441,12 +444,20 @@ class ConfigIndex(object):
 
     # -- lookup ------------------------------------------------------------- #
     def resolve(self, symbol: str) -> Optional[ConfigValue]:
-        """Resolve a config key, environment variable, or dotted symbol."""
+        """Resolve a config key, environment variable, or dotted symbol.
+
+        A camelCase identifier is tried as SNAKE_CASE too: code says
+        `refundCallbackProcessorTopic`, the `.env` says
+        `REFUND_CALLBACK_PROCESSOR_TOPIC`, and without that split the two never
+        meet - which silently costs a real topic edge.
+        """
         if not symbol:
             return None
+        tail = symbol.rsplit(".", 1)[-1]
         dotted = symbol.replace("_", ".").lower()
         shouty = symbol.replace(".", "_").replace("-", "_").upper()
-        for candidate in (symbol, dotted, symbol.lower(), shouty):
+        snake = _CAMEL_TO_SNAKE.sub(r"\1_\2", tail).upper()
+        for candidate in (symbol, tail, dotted, symbol.lower(), shouty, snake):
             if candidate in self.env:
                 return self.env[candidate]
             if candidate in self.values:

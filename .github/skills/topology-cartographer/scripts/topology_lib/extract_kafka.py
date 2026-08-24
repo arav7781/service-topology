@@ -310,7 +310,14 @@ def _is_py_producer(identifier: str, method: str, text: str) -> bool:
 NODE_NAME = "kafka-node"
 NODE_SUFFIXES = (".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs")
 
-_NODE_GATE = re.compile(r"kafkajs|node-rdkafka|KafkaClient|@nestjs/microservices|\bKafka\b")
+# A team that wraps kafkajs in its own PubSubService never mentions kafkajs at
+# the call site - the file imports `IPubSubService` and nothing else. Gating on
+# the vendor name alone silently skips every such repository, so accept the
+# vocabulary a wrapper uses too, case-insensitively.
+_NODE_GATE = re.compile(
+    r"kafkajs|node-rdkafka|kafkaclient|@nestjs/microservices|\bkafka\b"
+    r"|pubsub|pub-sub|\bproducer\b|\bconsumer\b|\btopic\b",
+    re.IGNORECASE)
 _NODE_TOPIC_PROP = re.compile(
     r"\btopic\s*:\s*(?P<value>[\"'`][^\"'`]+[\"'`]|[A-Za-z_$][\w.$\[\]'\"]*)")
 _NODE_TOPICS_PROP = re.compile(r"\btopics\s*:\s*\[(?P<value>[^\]]*)\]")
@@ -320,6 +327,59 @@ _NODE_EMIT = re.compile(r"\b[A-Za-z_$][\w$]*\s*\.\s*(?:emit|publish)\s*\(\s*(?P<
 _NODE_PATTERN = re.compile(r"@(?:MessagePattern|EventPattern)\s*\(\s*(?P<first>[^)]+)\)")
 _NODE_GROUP = re.compile(r"groupId\s*:\s*[\"'`]([^\"'`]+)[\"'`]")
 _NODE_KEY = re.compile(r"\bkey\s*:\s*([^,}\n]+)")
+
+
+# `const refundTopic = this.configService.get<string>(INFRA.KAFKA.TOPICS.X)`
+# `private readonly refundTopic = configService.get("X")`
+# `const refundTopic = "orders.created"`
+_NODE_TOPIC_CONST = re.compile(
+    r"(?:const|let|var|readonly)\s+(?P<name>[A-Za-z_$][\w$]*)"
+    r"\s*(?::\s*[\w<>\[\]|\s]+?)?\s*=\s*(?P<value>[^;]{0,300})",
+    re.DOTALL)
+_CONFIG_GET = re.compile(
+    r"(?:configService|config|conf)\s*\.\s*get(?:OrThrow)?\s*(?:<[^>]*>)?\s*\("
+    r"\s*(?P<key>[^,)]+)", re.DOTALL)
+
+
+def _node_topic_constants(lines: List[str]) -> dict:
+    """symbol -> the literal or config key it resolves to, within one file.
+
+    Topic names in a wrapped-client codebase are almost never literal at the
+    call site; they are a `const` two screens up that reads a config key. The
+    HTTP extractor already resolves base URLs this way - Kafka needs the same,
+    or every such binding degrades to an unresolved inference.
+
+    Scans the joined text rather than line by line: a prettier-formatted
+    declaration puts the name, the getter and the key on three separate lines,
+    and a per-line scan sees only `= this.configService.get<string>(`.
+    """
+    table = {}  # type: dict
+    text = "\n".join(lines)
+    for match in _NODE_TOPIC_CONST.finditer(text):
+        name = match.group("name")
+        if name in table:
+            continue
+        # Everything up to the statement terminator, newlines included.
+        value = match.group("value")
+        literal = _LITERAL_VALUE.match(value.strip())
+        if literal is not None:
+            table[name] = literal.group("value")
+            continue
+        getter = _CONFIG_GET.search(value)
+        if getter is not None:
+            # `INFRA.KAFKA.TOPICS.REFUND_REQUEST_TOPIC` -> the last segment is
+            # the key the config index will actually have.
+            key = getter.group("key").strip().strip("\"'`").strip()
+            table[name] = key.rsplit(".", 1)[-1]
+            continue
+        env = _ENV_VALUE.search(value)
+        if env is not None:
+            table[name] = env.group("key")
+    return table
+
+
+_LITERAL_VALUE = re.compile(r"^[\"'`](?P<value>[^\"'`]+)[\"'`]")
+_ENV_VALUE = re.compile(r"process\.env\.(?P<key>[A-Za-z_]\w*)")
 
 
 def applies_node(record: FileRecord) -> bool:
@@ -336,6 +396,7 @@ def extract_node(context: Context, record: FileRecord) -> None:
         return
     group = _NODE_GROUP.search(text)
     group_detail = "group={0}".format(group.group(1)) if group else ""
+    constants = _node_topic_constants(lines)
 
     for index, raw_line in enumerate(lines):
         raw = strip_comment(raw_line, record.suffix)
@@ -352,7 +413,8 @@ def extract_node(context: Context, record: FileRecord) -> None:
             args = balanced_call_args(chunk, paren_after(chunk, pattern))
             detail = group_detail if direction == EDGE_CONSUMES else _node_key(args)
             for value in _node_topics(args):
-                resolved = context.resolve_topic(extract_argument(value), record, line_no)
+                resolved = _resolve_node_topic(context, value, constants,
+                                               record, line_no)
                 if resolved is not None:
                     context.add_topic_edge(service, resolved, direction,
                                            record, line_no, detail, NODE_NAME)
@@ -372,6 +434,18 @@ def extract_node(context: Context, record: FileRecord) -> None:
             if resolved is not None:
                 context.add_topic_edge(service, resolved, EDGE_CONSUMES,
                                        record, line_no, "nest pattern", NODE_NAME)
+
+
+def _resolve_node_topic(context: Context, value: str, constants: dict,
+                        record: FileRecord, line_no: int):
+    """Resolve a topic argument, following a file-local constant if it is one."""
+    bare = value.strip().strip("\"'`")
+    target = constants.get(bare, value)
+    resolved = context.resolve_topic(extract_argument(target), record, line_no)
+    if resolved is not None and resolved.tag == CODE and bare in constants:
+        resolved.note = (resolved.note or
+                         "topic name read via the file-local constant `{0}`".format(bare))
+    return resolved
 
 
 def _node_topics(args: str) -> List[str]:

@@ -95,6 +95,35 @@ argument:
 becomes the consumer edge's label - kafkajs conventionally declares it once per
 module.
 
+**Wrapped clients.** Many teams put kafkajs behind their own service class, so
+the call site imports `IPubSubService` and never mentions kafkajs at all:
+
+```ts
+const refundTopic = this.configService.get<string>(
+    INFRA.KAFKA.TOPICS.REFUND_REQUEST_TOPIC,
+);
+await this.iPubSubService.subscribe({ topic: refundTopic, ... });
+```
+
+Two things make this resolvable, and both are needed - either alone yields
+nothing:
+
+1. **The gate accepts wrapper vocabulary**, not just vendor names: `pubsub`,
+   `pub-sub`, `topic`, `producer`, `consumer`, case-insensitively. Gating on
+   `kafkajs` alone silently skips every repository built this way.
+2. **File-local constants are followed.** A `const`/`readonly` whose value is a
+   literal, a `process.env.X`, or a `configService.get(...)` call is recorded,
+   and the last dotted segment of the key (`INFRA.KAFKA.TOPICS.X` -> `X`) is
+   what the config index is asked for. The declaration is matched across
+   newlines, because a formatter routinely splits it over three lines.
+
+The config index then resolves `REFUND_REQUEST_TOPIC` against `.env`,
+`application.yml`, compose, Helm, or Terraform. A camelCase identifier is also
+tried as `SNAKE_CASE`, so `refundCallbackProcessorTopic` finds
+`REFUND_CALLBACK_PROCESSOR_TOPIC`. All three ends were read, so the edge is
+`[CODE]`; only a key with no value anywhere in the repository degrades to
+`[INFERENCE]`.
+
 ---
 
 ## Go - segmentio/kafka-go, sarama
