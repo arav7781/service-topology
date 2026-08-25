@@ -125,6 +125,11 @@ python3 scripts/render_mermaid.py service-topology/graph-model.laid-out.json \
     --mode all --output-dir service-topology
 ```
 
+`--mode all` is the widest option, not the default one. Render what the user
+asked for: `--mode master`, `--mode micro --service <name>`, or `--mode all
+--no-master` for every micro topology and no whole-system diagram. Handing back
+a master topology nobody asked for buries the diagram they wanted.
+
 Two artefacts per diagram. The `.drawio` is the deliverable; the `.mmd` is the
 fallback that needs nothing installed and renders in a pull request, a Markdown
 preview, or a chat window.
@@ -132,6 +137,13 @@ preview, or a chat window.
 Both carry the same evidence distinction: solid means `[CODE]`, dashed grey
 means it is not confirmed - and both draw the same shapes, so the `.mmd` and the
 `.drawio` read as one diagram rather than two.
+
+Labels come from the renderers. A node's name is wrapped to what its shape can
+hold, and drawn under the shape when it cannot hold it; an arrow gets a short
+relationship name with anything that merely repeats an adjacent node's name
+dropped, and the layout has already slid it clear of the other labels. The
+untrimmed string is on the cell as `fullLabel`, in its tooltip, and in
+`evidence/sources.md`.
 
 Passing `--theme` here overrides the stamped theme and re-runs the layout, so
 the shapes and the coordinates can never disagree.

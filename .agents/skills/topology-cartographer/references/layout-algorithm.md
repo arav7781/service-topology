@@ -20,7 +20,7 @@ and would move every node whenever one edge changed.
 
 ---
 
-## The five steps
+## The six steps
 
 ### 1. Break cycles
 
@@ -63,24 +63,53 @@ Layer index becomes a column, position within the layer becomes a row. Each
 column is centred vertically against the tallest column, so the arrows between
 adjacent columns run roughly horizontal.
 
-Node size and column spacing come from the theme, not from this module. Under
-`streams` (the default) every node has a fixed size per kind - an 80x80 circle
-for a topic whatever its name is - and the columns are spaced 240 units apart so
-a name that overhangs its circle still clears the next column. Under `classic`
-there are no fixed sizes, so each box is fitted to its label at eight units per
-character, clamped to 160-280 wide, in 120-unit columns.
+What is reserved for a node is its **footprint**, not its shape. Those differ
+whenever a label is drawn outside the shape it names: a topic in `streams` is an
+80x80 circle, but `payrx-core-refund-request-topic-local` written under it needs
+about 130 units of width and two more lines of height. Reserving 80 is how a
+name ends up written across the node below it, which is the single most common
+cause of an unreadable diagram.
+
+Node size, wrap width and column spacing come from the theme, not from this
+module. Under `streams` (the default) every node has a fixed size per kind, a
+topic's name is wrapped at 22 characters and drawn below the circle, and the
+columns are spaced 240 units apart. Under `classic` there are no fixed sizes, so
+each box is fitted to its *wrapped* label at eight units per character, clamped
+to 160-280 wide, in 160-unit columns.
 
 This is why the theme is chosen at layout time and stamped into the layout
 block: a renderer that styled these coordinates with the other theme's shapes
-would draw every node at the wrong size.
+would draw every node at the wrong size, and one that wrapped labels at a
+different width would draw them at the wrong height.
 
 ### 5. Route
 
 | Span | Route |
 |---|---|
 | One layer | Straight. Under `classic`, pinned to the right edge of the source and the left edge of the target; under `streams` left floating, so the line lands on the perimeter point of a circle or a diamond rather than its bounding box |
-| More than one layer | A jog at the horizontal midpoint, so the arrow does not clip the columns it flies over |
+| More than one layer | Up into a channel above the diagram, across, and back down. Three lanes, rotating. Drawn straight it would run through every box between its two ends - and so would its label |
 | Zero or negative (a back edge) | Down into a channel below the diagram, across, and back up. Three lanes, rotating, so parallel back edges do not overlap |
+
+The channel above is only reserved when something actually spans more than one
+column. An ordinary producer-topic-consumer chain moves one column at a time and
+would otherwise gain a band of white space at the top for nothing.
+
+### 6. Place the arrow labels
+
+draw.io centres every edge label, so four arrows crossing one column gap write
+four labels in the same place, and a long arrow writes its label on top of
+whatever it flies over. Each label is therefore slid along its own arrow to the
+first position that is clear of every node, every node label, and every label
+already placed. Candidates are tried nearest-the-middle first, so a label only
+moves as far as it has to; a crowded diagram where nothing is free keeps the
+position with the fewest collisions rather than dropping back onto the pile.
+
+Only the label moves. The arrow, and both things it connects, stay exactly where
+step 4 put them.
+
+The label's size is taken as its worst case - `edge_label_chars` wide - because
+the text is not written until render time. That is deliberate: `render.py` owns
+the wording, the layout owns the geometry, and neither reaches into the other.
 
 ---
 
@@ -103,6 +132,20 @@ Fixed columns mean every micro topology reads the same way, so a reader who has
 seen one knows where to look in the next. It also makes the two-hop Kafka
 context legible: you can see who else is on the other end of your topic without
 that being confused with a direct call.
+
+---
+
+## Why labels are short
+
+A diagram label is a *relationship name*: `produces`, `group=refund`,
+`POST /.../claims`. It is not a restatement of the diagram. Both ends of an
+arrow are already drawn and named, so `render.py` drops any part of a label that
+merely repeats the name of the shape at either end, and elides what is left to
+the theme's `edge_label_chars`.
+
+Nothing is lost. The full string is on the edge's `fullLabel` and tooltip in the
+`.drawio` file - one `Edit > Edit Data` away - and in `evidence/sources.md`,
+which is generated with no limit at all because a table has the room.
 
 ---
 

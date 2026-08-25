@@ -99,6 +99,7 @@ picture rather than take it on faith.
 | **Synchronous calls** | OpenAPI specs · `.proto` plus generated-stub usage · requests/httpx · axios/fetch/got · RestTemplate/WebClient/OkHttp/Feign · net/http, resty |
 | **Config resolution** | A topic named `${app.topics.orders}` is followed into `application.yml`, `.env`, docker-compose, Helm values, or Terraform — and stays `[CODE]`, because both ends were read |
 | **Two levels of detail** | One master topology for the whole system; one micro topology per service, with message keys, consumer groups, and method+path |
+| **Labels that stay legible** | Names are wrapped to what the shape can hold and drawn below it when it cannot; arrow labels are short relationship names, slid clear of each other and of every node. The full string lives in the cell data and the evidence report |
 | **Visible uncertainty** | `[CODE]` renders solid; `[INFERENCE]` renders dashed grey, carries a written reason, and is listed separately |
 | **Evidence inside the file** | Every node and edge is a `UserObject` — select an arrow in draw.io, `Edit > Edit Data`, and read its source location |
 | **Byte-identical re-runs** | No timestamps, content-hashed diagram ids, total ordering everywhere. A diff of two runs is a diff of two architectures |
@@ -131,7 +132,7 @@ python3 $S/build_graph_model.py --input /tmp/scan.json \
 python3 $S/layout_graph.py service-topology/graph-model.json \
     -o service-topology/graph-model.laid-out.json
 python3 $S/render_drawio.py service-topology/graph-model.laid-out.json \
-    --mode all --output-dir service-topology
+    --mode all --output-dir service-topology        # add --no-master for micros only
 python3 $S/render_mermaid.py service-topology/graph-model.laid-out.json \
     --mode all --output-dir service-topology
 python3 $S/validate_graph_model.py service-topology/graph-model.json \
@@ -239,9 +240,14 @@ python3 skills/topology-cartographer/scripts/scan_repository.py \
 |---|---|
 | `scan` | Extract bindings and build the graph model. No diagrams. **Run this first.** |
 | `master` | The whole-system diagram |
-| `micro <service>` | One service's neighbourhood, with full label detail |
+| `micro <service>` | One service's neighbourhood, two hops through the topics it touches |
 | `all` | Master plus one micro topology per service |
 | `refresh` | Re-scan and re-render after code changes |
+
+The mode is the deliverable: ask for one service's micro topology and that is
+the only diagram you get. `--no-master` on `layout_graph.py`,
+`render_drawio.py` and `render_mermaid.py` is the switch that enforces it when
+you are driving the scripts yourself.
 
 > *"Use the topology-cartographer skill in scan mode."*
 > *"Which services consume `orders.created`?"*

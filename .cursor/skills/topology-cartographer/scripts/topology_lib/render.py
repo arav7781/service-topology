@@ -36,9 +36,10 @@ from .model import (
     GraphModel,
     Node,
 )
+from .textutil import compact, echoes
 from .theme import DEFAULT_THEME, Theme, get_theme
 
-RENDERER_VERSION = "1.0.0"
+RENDERER_VERSION = "1.1.0"
 DRAWIO_AGENT = "topology-cartographer/" + RENDERER_VERSION
 
 # `<br>`, not `&#10;`: the legend cell is html=1 like every other label, so a
@@ -73,28 +74,61 @@ def legend_text(theme: Theme) -> str:
 # Shared label helpers
 # --------------------------------------------------------------------------- #
 
-def node_label(node: Node) -> str:
-    return node.display or node.id
+def node_label(node: Node, theme: Optional[Theme] = None) -> str:
+    """The node's name, broken into lines the shape can actually hold.
+
+    The break has to happen here rather than in the viewer: draw.io wraps a
+    label on spaces, and `payrx-core-refund-request-topic-local` has none, so
+    left alone it is drawn as one run three times wider than its circle. The
+    layout reserved room for exactly these lines - it asked the same theme.
+    """
+    active = theme if theme is not None else get_theme(None)
+    return "\n".join(active.wrap(node.kind, node.display or node.id))
 
 
-def edge_label(edge: Edge, model: GraphModel, include_topic: bool = False) -> str:
-    """What the arrow says. Every edge gets a label; none is left bare."""
-    parts = []  # type: List[str]
-    if include_topic and edge.type in (EDGE_PRODUCES, EDGE_CONSUMES):
-        topic_id = edge.dst if edge.type == EDGE_PRODUCES else edge.src
-        topic = model.topics.get(topic_id)
-        if topic is not None:
-            parts.append(node_label(topic).split("\n")[0])
+def node_label_text(model: GraphModel, node_id: str) -> str:
+    node = model.node(node_id)
+    return (node.display if node is not None else node_id) or node_id
+
+
+def _relationship(edge: Edge) -> str:
+    """The name of the relationship itself, when nothing better is known."""
+    if edge.type == EDGE_CALLS:
+        return edge.protocol or "calls"
+    if edge.type == EDGE_DEPENDS:
+        return edge.protocol or "depends on"
+    return edge.type
+
+
+def edge_label(edge: Edge, model: GraphModel, limit: int = 0) -> str:
+    """What the arrow says. Every edge gets a label; none is left bare.
+
+    A label is a *relationship name*, not a restatement of the diagram. Both
+    ends of the arrow are already drawn and named, so a part that only repeats
+    the name of the shape it points at is dropped, and what is left is elided to
+    `limit` characters. That is what stops a micro topology writing
+    `payrx-core-refund-detail-request-topic-local` across the arrow that already
+    ends at the circle of that name, four times, in the same column gap.
+
+    `limit=0` keeps everything: the evidence report is a table, it has the room,
+    and it is where a reader goes for the exact string. The full text also
+    survives on the diagram itself, in the tooltip and in `fullLabel`.
+    """
     if edge.type == EDGE_DEPENDS:
         # The database name is already on the box it points at; repeating it
         # next to the arrow costs a label and says nothing. The protocol does.
         return edge.protocol or edge.type
-    if edge.method:
-        parts.append(edge.method)
-    if edge.detail:
-        parts.append(edge.detail)
+
+    ends = [node_label_text(model, edge.src), node_label_text(model, edge.dst)]
+    parts = []  # type: List[str]
+    for part in (edge.method, edge.detail):
+        if not part:
+            continue
+        if limit > 0 and any(echoes(part, end) for end in ends):
+            continue
+        parts.append(compact(part, limit))
     if not parts:
-        parts.append(edge.type if edge.type != EDGE_CALLS else (edge.protocol or "calls"))
+        parts.append(_relationship(edge))
     return "\n".join(parts)
 
 
@@ -146,7 +180,6 @@ def _tooltip(citations: List[str], note: str = "") -> str:
 # --------------------------------------------------------------------------- #
 
 def render_drawio(model: GraphModel, diagram: Dict[str, Any],
-                  include_topic_labels: bool = False,
                   include_legend: bool = True,
                   theme: Optional[str] = None,
                   flow_animation: Optional[bool] = None) -> str:
@@ -199,7 +232,7 @@ def render_drawio(model: GraphModel, diagram: Dict[str, Any],
             continue
         geometry = placed[node_id]
         holder = ET.SubElement(root, "UserObject", {
-            "label": _html(node_label(node)),
+            "label": _html(node_label(node, active)),
             "tooltip": _tooltip(list(node.source_evidence)),
             "topologyKind": node.kind,
             "topologyId": node.id,
@@ -225,15 +258,22 @@ def render_drawio(model: GraphModel, diagram: Dict[str, Any],
         if source_cell is None or target_cell is None:
             continue
 
+        label = edge_label(edge, model, active.edge_label_chars)
+        full = edge_label(edge, model)
+        shortened = full.replace("\n", " ") if full != label else ""
         holder = ET.SubElement(root, "UserObject", {
-            "label": _html(edge_label(edge, model, include_topic_labels)),
-            "tooltip": _tooltip([edge.source], edge.note),
+            "label": _html(label),
+            "tooltip": _tooltip([edge.source], edge.note or shortened),
             "evidenceTag": edge.evidence_tag,
             "sourceLocation": edge.source,
             "alsoAt": "; ".join(edge.also_at),
             "edgeType": edge.type,
             "id": "edge-{0}".format(index),
         })
+        if shortened:
+            # Nothing is lost by shortening the drawn label: the whole string is
+            # one `Edit > Edit Data` away, and it is in `evidence/sources.md`.
+            holder.set("fullLabel", shortened)
         if edge.note:
             holder.set(
                 "inferenceNote" if not edge.confirmed else "resolutionNote",
@@ -255,7 +295,15 @@ def render_drawio(model: GraphModel, diagram: Dict[str, Any],
             "style": style, "edge": "1", "parent": "1",
             "source": source_cell, "target": target_cell,
         })
-        geometry = ET.SubElement(cell, "mxGeometry", {"relative": "1", "as": "geometry"})
+        attributes = {"relative": "1", "as": "geometry"}
+        # Slide the label along its own arrow, away from the midpoint every
+        # other arrow in this column gap also wants. The layout computed the
+        # offsets; this only writes them down.
+        label_x = float(entry.get("label_x") or 0.0)
+        if label_x:
+            attributes["x"] = "{0:g}".format(label_x)
+            attributes["y"] = "0"
+        geometry = ET.SubElement(cell, "mxGeometry", attributes)
         if waypoints:
             points = ET.SubElement(geometry, "Array", {"as": "points"})
             for point in waypoints:
@@ -324,7 +372,6 @@ def _mermaid_class(node: Node) -> str:
 
 
 def render_mermaid(model: GraphModel, title: str = "Master topology",
-                   include_topic_labels: bool = False,
                    theme: Optional[str] = None) -> str:
     """A Mermaid `flowchart` carrying the same content as the .drawio file.
 
@@ -353,7 +400,7 @@ def render_mermaid(model: GraphModel, title: str = "Master topology",
         node = model.nodes[node_id]
         shape = active.mermaid_shapes.get(
             node.kind, active.mermaid_shapes[KIND_SERVICE])
-        label = _mermaid_text(node_label(node))
+        label = _mermaid_text(node_label(node, active))
         lines.append("  " + shape.format(aliases[node_id], label))
         by_kind.setdefault(_mermaid_class(node), []).append(aliases[node_id])
 
@@ -365,7 +412,7 @@ def render_mermaid(model: GraphModel, title: str = "Master topology",
         if source is None or target is None:
             continue
         arrow = "-->" if edge.confirmed else "-.->"
-        label = _mermaid_text(edge_label(edge, model, include_topic_labels))
+        label = _mermaid_text(edge_label(edge, model, active.edge_label_chars))
         lines.append('  {0} {1}|"{2}"| {3}'.format(source, arrow, label, target))
 
     lines.append("")

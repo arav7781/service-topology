@@ -445,10 +445,10 @@ def tool_generate_micro_topology(arguments: Dict[str, Any]) -> Dict[str, Any]:
     name = safe_filename(service)
     drawio = writer.write_text(
         "micro/{0}.drawio".format(name),
-        render_drawio(subgraph, diagram, include_topic_labels=True, theme=theme))
+        render_drawio(subgraph, diagram, theme=theme))
     mermaid = writer.write_text(
         "micro/{0}.mmd".format(name),
-        render_mermaid(subgraph, title, include_topic_labels=True, theme=theme))
+        render_mermaid(subgraph, title, theme=theme))
 
     inbound = [e for e in subgraph.edges if e.dst == service]
     outbound = [e for e in subgraph.edges if e.src == service]

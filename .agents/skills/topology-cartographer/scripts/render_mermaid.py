@@ -99,6 +99,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="node shapes; defaults to the theme the model was laid out "
              "under, so the .mmd and the .drawio read as one diagram")
     parser.add_argument(
+        "--no-master", action="store_true",
+        help="with --mode all, render only the micro topologies - the same "
+             "rule render_drawio.py follows, so the two stay in step")
+    parser.add_argument(
         "--fenced", action="store_true",
         help="wrap the output in a ```mermaid fence, ready to paste into chat")
     parser.add_argument(
@@ -151,16 +155,17 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     try:
         if args.mode == "all":
-            master = render_mermaid(model, "Master topology", theme=theme)
-            target = writer.write_text(
-                user_path(str(Path(args.output_dir) / "master-topology.mmd")),
-                fence(master, args.fenced))
-            print("wrote {0}".format(target))
+            if not args.no_master:
+                master = render_mermaid(model, "Master topology", theme=theme)
+                target = writer.write_text(
+                    user_path(str(Path(args.output_dir) / "master-topology.mmd")),
+                    fence(master, args.fenced))
+                print("wrote {0}".format(target))
             for service_id in micro_targets(model):
                 text = render_mermaid(
                     subgraph_for_service(model, service_id),
                     "Micro topology - {0}".format(model.services[service_id].display),
-                    include_topic_labels=True, theme=theme)
+                    theme=theme)
                 relative = "micro/{0}.mmd".format(safe_filename(service_id))
                 target = writer.write_text(
                     user_path(str(Path(args.output_dir) / relative)), fence(text, args.fenced))
@@ -179,7 +184,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             text = render_mermaid(
                 subgraph_for_service(model, args.service),
                 "Micro topology - {0}".format(model.services[args.service].display),
-                include_topic_labels=True, theme=theme)
+                theme=theme)
         else:
             text = render_mermaid(model, "Master topology", theme=theme)
 

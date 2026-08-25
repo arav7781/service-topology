@@ -25,6 +25,10 @@ service-topology/
     └── sources.md                every edge's tag and file:line
 ```
 
+That is the full tree, which is what `all` produces. A narrower mode writes a
+subset and leaves the rest absent - `micro <service>` writes no
+`master-topology.*` at all, because it was not asked to.
+
 File names are slugs of the service id. Ids are stable across `refresh` runs:
 never renamed because a label changed, never renumbered.
 

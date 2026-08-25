@@ -5,8 +5,9 @@ description: >-
   service-to-service calls into architecture diagrams. Extracts every binding it
   can trace to a file and line, builds a structured graph model, and renders
   valid .drawio (mxGraph) diagrams plus a Mermaid fallback under
-  service-topology/ - one master topology for the whole system and one micro
-  topology per service. Discovery and diagramming only - never modifies the
+  service-topology/ - a master topology for the whole system, a micro topology
+  per service, or only the one that was actually asked for. Discovery and
+  diagramming only - never modifies the
   analysed repository, never commits, never runs the application. Use when the
   user asks what talks to what, which services produce or consume a Kafka topic,
   what a service depends on, wants an architecture diagram of a codebase, or
@@ -104,13 +105,35 @@ just an argument that selects which phases run.
 |---|---|---|
 | `scan` | 0-2 | Extract bindings and build the graph model. No diagrams. Cheap. Run this first. |
 | `master` | 0-5 | The whole-system diagram: every service, topic, and edge. |
-| `micro <service>` | 0-5 | One service's direct neighbourhood, with full label detail. |
+| `micro <service>` | 0-5 | One service's direct neighbourhood, two hops through the topics it touches. |
 | `all` | 0-5 | Master plus one micro topology per discovered service. |
 | `refresh` | 1-5 | Re-scan and re-render after code changes, then report what moved. |
 
 Default when no mode is given: **`scan`**. Never silently escalate to `all` -
 `scan` is cheap, and its service list is what tells the user which micro
 topology is worth generating first.
+
+### The mode is the deliverable
+
+**Render what was asked for, and nothing else.** `micro payments-svc` means one
+diagram: `service-topology/micro/payments-svc.drawio` and its `.mmd`. It does
+not mean that diagram *and* a master topology, and it does not mean one per
+service. A whole-system diagram nobody asked for is not a bonus - it is a
+second, larger, slower artefact the user now has to read and decide whether to
+trust, and it buries the one they actually wanted.
+
+| The user asked for | Produce exactly |
+|---|---|
+| "map this repo", "what talks to what" | `scan`, then ask which diagram they want |
+| "the master topology", "the whole system" | `master-topology.drawio` + `.mmd` |
+| "micro topology for X", "what does X touch" | `micro/X.drawio` + `.mmd` |
+| "micro topologies", no service named | one micro per service, **no master** |
+| "everything", "master and the micros" | `all` |
+
+`--no-master` on `layout_graph.py`, `render_drawio.py` and `render_mermaid.py`
+is how you hold to that - see Phase 3 and Phase 4. If you genuinely think the
+user needs a diagram they did not ask for, say so in one sentence and let them
+answer; do not render it and hand it over.
 
 If the repository has more than roughly 5,000 source files, or `scan` reports
 more than 25 services, ask the user which subsystems to focus on before running
@@ -208,10 +231,18 @@ worth generating.
 python3 $S/layout_graph.py service-topology/graph-model.json \
     -o service-topology/graph-model.laid-out.json
 
+# one service only - lay out its micro topology and nothing else
+python3 $S/layout_graph.py service-topology/graph-model.json \
+    --service <name> --no-master \
+    -o service-topology/graph-model.laid-out.json
+
 # label-fitted boxes instead of the default dataflow shapes
 python3 $S/layout_graph.py service-topology/graph-model.json \
     --theme classic -o service-topology/graph-model.laid-out.json
 ```
+
+What is laid out here is what can be rendered later, so a mode that asked for
+one service stops narrowing here rather than in Phase 4.
 
 A theme fixes node *sizes* as well as node styles, so it is chosen here and
 stamped into the layout block; the renderers follow what is stamped. `streams`
@@ -241,6 +272,12 @@ python3 $S/render_drawio.py service-topology/graph-model.laid-out.json \
     --mode micro --service <name> \
     -o service-topology/micro/<name>.drawio
 
+# every service, no master
+python3 $S/render_drawio.py service-topology/graph-model.laid-out.json \
+    --mode all --no-master --output-dir service-topology
+python3 $S/render_mermaid.py service-topology/graph-model.laid-out.json \
+    --mode all --no-master --output-dir service-topology
+
 # everything
 python3 $S/render_drawio.py service-topology/graph-model.laid-out.json \
     --mode all --output-dir service-topology
@@ -252,6 +289,16 @@ Both renderers style the diagram for the theme it was laid out under. Passing
 `--theme` here overrides that and re-runs the layout, so the shapes and the
 coordinates cannot disagree. `--flow-animation` animates the arrows in draw.io -
 worth it on a small dataflow, unreadable on a large master topology.
+
+Labels are the renderers' business, not yours. An arrow gets a relationship
+name - `produces`, `group=refund`, `POST /.../claims` - short enough to sit in
+the gap it is drawn in, with anything that merely repeats the name of the shape
+at either end dropped; the full string stays on the cell's `fullLabel`, in its
+tooltip, and in `evidence/sources.md`. A node's name is wrapped to the width its
+shape can hold, and the layout reserved room for exactly those lines. If a
+diagram still reads badly, that is a scope problem or a `layout.py` problem -
+read `references/layout-algorithm.md`. It is never a reason to hand-edit a
+label, a coordinate, or a rendered file.
 
 ### Phase 5 - Validation and handover
 
@@ -292,6 +339,11 @@ service-topology/
 └── evidence/
     └── sources.md                every edge's tag and file:line
 ```
+
+That tree is what `all` produces. A narrower mode writes a subset of it and
+leaves the rest absent: `micro <service>` writes `graph-model.json`,
+`micro/<service>.drawio`, `micro/<service>.mmd` and the evidence report, and no
+`master-topology.*` at all.
 
 Service file names are slugs of the service id: `orders-svc.drawio`. Ids are
 stable across `refresh` runs - never rename a service between runs just because
@@ -392,8 +444,9 @@ A run is complete only when all of these hold:
       dashed and grey, and appears under "Inferred, not confirmed".
 - [ ] Every coordinate came from `layout_graph.py`; every byte of XML came from
       `render_drawio.py`.
-- [ ] The master topology and at least one micro topology were produced, and the
-      micro topology is a strict subset of the master centred on one service.
+- [ ] Every diagram the selected mode calls for was produced - and none it does
+      not. Each micro topology is a strict subset of the master model, centred
+      on one service.
 - [ ] Re-running the pipeline on unchanged code produces byte-identical output.
 - [ ] `evidence/sources.md` lists every edge with its tag and location.
 - [ ] No file outside `service-topology/` was created or modified.
@@ -417,7 +470,8 @@ Stop immediately and report when:
   live registry to resolve a binding;
 - you find yourself about to hand-write mxGraph XML, hand-place a node, or edit
   a generated file;
-- you find yourself about to write outside `service-topology/`.
+- you find yourself about to write outside `service-topology/`;
+- you find yourself about to render a diagram the user did not ask for.
 
 ---
 

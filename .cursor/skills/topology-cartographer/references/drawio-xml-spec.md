@@ -95,10 +95,15 @@ rectangle on a dark canvas.
 Cache is the one place this theme spends colour, because a cache and a database
 are both cylinders and nothing but fill can separate them.
 
-Shapes are fixed-size and small, so a long topic name overhangs its circle -
-that is the idiom, not a defect, and it is why this theme also asks for a
-240-unit column gap. Topic labels are set in a monospace stack, which is what
-makes `orders.created.v2` and `orders_created_v2` distinguishable at 9px.
+Shapes are fixed-size and small, so a name too long to sit inside one is drawn
+*underneath* it: topics and external systems carry
+`verticalLabelPosition=bottom;verticalAlign=top`, wrapped at 22 characters, and
+`layout_graph.py` reserves that width and height around the shape. Left inside,
+`payrx-core-refund-request-topic-local` is drawn as one unbroken run three times
+wider than its circle, on top of whatever sits next to it - draw.io wraps HTML
+labels on spaces, and a topic name has none. Topic labels are set in a monospace
+stack, which is what makes `orders.created.v2` and `orders_created_v2`
+distinguishable at 9px.
 
 Edges carry no `edgeStyle`, so draw.io draws the direct line between two
 perimeter points rather than an elbow, and adjacent-column arrows are *not*
@@ -115,6 +120,15 @@ compact for a small graph, and still selectable so that upgrading this skill
 does not silently redraw an existing pipeline's output.
 
 ### Both themes
+
+Node labels are broken into lines by the renderer, not by draw.io, using the
+theme's per-kind wrap width. The layout counted the same lines when it reserved
+the space, so what is drawn is the size that was planned for.
+
+Arrow labels are relationship names - `produces`, `group=refund`,
+`POST /.../claims` - elided to the theme's `edge_label_chars`, with any part
+that merely repeats the name of the shape at either end dropped entirely. The
+full string travels on the cell as `fullLabel` and in the tooltip.
 
 Edge colours carry the relationship, and the dash carries the evidence:
 
@@ -163,12 +177,13 @@ gets this wrong the first time a name contains an ampersand.
 
 ---
 
-## Waypoints
+## Waypoints and label positions
 
-Routed edges carry explicit points:
+Routed edges carry explicit points, and an edge whose label had to move carries
+its position on the same geometry:
 
 ```xml
-<mxGeometry relative="1" as="geometry">
+<mxGeometry x="-0.2" y="0" relative="1" as="geometry">
   <Array as="points">
     <mxPoint x="640" y="420" />
     <mxPoint x="200" y="420" />
@@ -176,7 +191,13 @@ Routed edges carry explicit points:
 </mxGeometry>
 ```
 
-Edges between adjacent columns carry none. Under `classic` they instead pin
+On an edge geometry, `x` is where the label sits along the arrow in draw.io's
+own units: `0` the middle, `-1` the source end, `+1` the target end. It is
+written only when the label was actually moved, which is what keeps an
+uncrowded diagram's labels in the middle where they are easiest to read. See
+`layout-algorithm.md` for how a position is chosen.
+
+Edges between adjacent columns carry no waypoints. Under `classic` they instead pin
 their exit and entry to the facing sides of the boxes (`exitX=1`, `entryX=0`),
 which is what makes a left-to-right diagram of rectangles read as left-to-right
 flow. Under `streams` they are left floating, because a pin computed for a

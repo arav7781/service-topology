@@ -4,8 +4,9 @@ description: >-
   Checks a Topology Cartographer graph model and its rendered diagrams before
   they reach a human. Verifies every citation against the real file, confirms
   the XML is well formed and every arrow connects declared nodes, proves the
-  render is reproducible, and confirms each micro topology is a strict subset of
-  the master. Read-only; reports problems, never fixes them by editing output.
+  render is reproducible, confirms each micro topology is a strict subset of the
+  master model, and reads the diagram for legibility. Read-only; reports
+  problems, never fixes them by editing output.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -74,18 +75,35 @@ differing file and the differing line; do not try to fix it in the output.
 ### 5. Micro is a strict subset of master
 
 For each micro topology: every node and every edge in it appears in the master
-model. A micro diagram containing something the master does not is a subgraph
-bug, and it means the two diagrams disagree about the system.
+**model** - `graph-model.json`, which every run produces, not
+`master-topology.drawio`, which a micro-only run correctly does not. A micro
+diagram containing something the model does not is a subgraph bug, and it means
+the two disagree about the system.
 
 Confirm the two are also *distinguishable* - a micro topology with the same node
-and edge count as the master means the subgraph did not actually narrow.
+and edge count as the whole model means the subgraph did not actually narrow.
+
+### 5b. Exactly the diagrams that were asked for
+
+Check the rendered files against the mode the user asked for. A `micro <service>`
+run that also wrote `master-topology.drawio`, or wrote a micro topology for every
+service, over-delivered - and over-delivering here means handing someone a
+whole-system diagram they did not ask for, did not scope, and may well trust. A
+`master` run that wrote no master is the same defect in the other direction.
+Report the extra files by name.
 
 ### 6. The diagram is legible
 
 Judgement, not a script:
 
 - boxes that overlap, or an edge passing through an unrelated box;
-- a label truncated to the point of meaninglessness;
+- labels written on top of each other, or on top of a shape. The layout places
+  node labels and slides arrow labels clear of both; overlapping text means the
+  reserved footprint and the drawn text disagree, which is a `layout.py` or
+  `theme.py` bug, never something to fix in the output;
+- a label elided to the point of meaninglessness. Arrow labels are deliberately
+  short - the full string is on the cell's `fullLabel` and in
+  `evidence/sources.md` - but `POST ...` alone identifies nothing;
 - a master topology so dense that the answer is `--scope`, not a bigger canvas;
 - inferred edges that are not visibly dashed and grey - if evidence quality is
   not visible at a glance, the diagram's main safety property is gone.

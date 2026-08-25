@@ -46,6 +46,8 @@ Usage
         -o service-topology/micro/orders-svc.drawio
     python3 render_drawio.py graph-model.laid-out.json --mode all \
         --output-dir service-topology
+    python3 render_drawio.py graph-model.laid-out.json --mode all --no-master \
+        --output-dir service-topology
     python3 render_drawio.py graph-model.laid-out.json --theme classic
     python3 render_drawio.py --example
 
@@ -82,7 +84,7 @@ from topology_lib.theme import THEME_NAMES  # noqa: E402
 from topology_lib.textutil import safe_filename  # noqa: E402
 
 EXAMPLE = """\
-<mxfile host="topology-cartographer" agent="topology-cartographer/1.0.0" \
+<mxfile host="topology-cartographer" agent="topology-cartographer/1.1.0" \
 version="24.7.17" type="device">
   <diagram id="8f14e45fceea167a5a36" name="Master topology">
     <mxGraphModel dx="940" dy="600" grid="1" gridSize="10" guides="1" \
@@ -146,6 +148,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="animate the arrows in draw.io (marching ants). Good on a small "
              "dataflow, unreadable on a large master topology")
     parser.add_argument(
+        "--no-master", action="store_true",
+        help="with --mode all, render only the micro topologies. Use it when "
+             "the user asked for micro topologies: a master diagram nobody "
+             "asked for is not a bonus, it is the wrong deliverable")
+    parser.add_argument(
         "--no-legend", action="store_true",
         help="omit the evidence legend box from the diagram")
     parser.add_argument(
@@ -183,7 +190,6 @@ def render_one(model: GraphModel, diagrams: Dict[str, Any], key: str,
     else:
         target_model = model
     return render_drawio(target_model, diagram,
-                         include_topic_labels=bool(focus),
                          include_legend=not no_legend,
                          theme=theme,
                          flow_animation=flow_animation or None)
@@ -217,6 +223,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.mode == "all":
             written = 0
             for key in sorted(diagrams):
+                if args.no_master and key == "master":
+                    continue
                 xml = render_one(model, diagrams, key, args.no_legend,
                                  args.theme, args.flow_animation)
                 if xml is None:

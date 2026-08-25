@@ -1,9 +1,13 @@
-"""Small text helpers shared by every extractor.
+"""Small text helpers shared by every extractor, and by the layout and renderers.
 
 Extraction is regular expressions over source text. That is the right tool for
 mapping call sites - we are locating bindings, not type-checking a program -
 but it needs guardrails: do not match inside a comment, do not miss a topic
 name that sits two lines below the call that uses it, and produce stable ids.
+
+The label helpers at the bottom are here for a related reason: `layout.py` has
+to know how tall a wrapped label is before `render.py` draws it, so both must
+break a name in exactly the same places. One implementation, called twice.
 """
 
 from __future__ import annotations
@@ -269,3 +273,124 @@ def line_of(lines: List[str], needle: str, default: int = 1) -> int:
         if needle in line:
             return number
     return default
+
+
+# --------------------------------------------------------------------------- #
+# Label text
+# --------------------------------------------------------------------------- #
+
+# Where a name may be broken. These are the separators the names in a topology
+# actually contain - `payrx-core-refund-request-topic-local`, `orders.created`,
+# `GET /orders/{id}` - so a break lands between words rather than mid-word.
+_WRAP_AFTER = "-_./:"
+
+
+def _wrap_chunks(text: str, width: int) -> List[str]:
+    """Split `text` into pieces that a line may end after."""
+    pieces = []  # type: List[str]
+    current = ""
+    for char in text:
+        current += char
+        if char in _WRAP_AFTER or char == " ":
+            pieces.append(current)
+            current = ""
+    if current:
+        pieces.append(current)
+
+    out = []  # type: List[str]
+    for piece in pieces:
+        # One unbroken run longer than the whole line: cut it, or it overhangs.
+        while len(piece) > width:
+            out.append(piece[:width])
+            piece = piece[width:]
+        if piece:
+            out.append(piece)
+    return out
+
+
+def wrap_label(value: str, width: int) -> List[str]:
+    """Break a label into lines of at most `width` characters.
+
+    The renderers cannot leave this to the viewer. draw.io wraps an HTML label
+    the way a browser does - on spaces - and a topic called
+    `payrx-core-refund-request-topic-local` has none, so it is drawn as one long
+    run that overhangs its circle and lands on top of whatever is next to it.
+    Breaking it here, on the separators the name already contains, is also what
+    lets `layout.py` and `render.py` agree on how tall a label is: they call
+    this function with the same width and count the same lines.
+    """
+    if width <= 0:
+        return [text for text in str(value or "").split("\n")] or [""]
+
+    lines = []  # type: List[str]
+    for raw in str(value or "").split("\n"):
+        chunks = _wrap_chunks(raw.strip(), width)
+        if not chunks:
+            lines.append("")
+            continue
+        current = ""
+        for chunk in chunks:
+            if current and len(current) + len(chunk) > width:
+                lines.append(current.rstrip())
+                current = chunk
+            else:
+                current += chunk
+        lines.append(current.rstrip())
+    return lines or [""]
+
+
+def compact(value: str, limit: int) -> str:
+    """One short line saying what a relationship *is*.
+
+    A limit of 0 or less returns the text unchanged, which is what the evidence
+    report wants - it is a table, it has the room, and it is the place a reader
+    goes for the full string. A diagram does not have the room: an arrow label
+    wider than the gap it sits in overlaps the next arrow's label, and two
+    unreadable labels are worse than two short ones.
+    """
+    text = " ".join(str(value or "").split())
+    if limit <= 0 or len(text) <= limit:
+        return text
+
+    if "/" in text:
+        # An endpoint: the verb and the last segments are what identify it, so
+        # elide from the left rather than cutting the meaning off the right.
+        head, _, path = text.partition("/")
+        segments = [segment for segment in path.split("/") if segment]
+        while segments:
+            candidate = "{0}.../{1}".format(head, "/".join(segments))
+            if len(candidate) <= limit:
+                return candidate
+            segments.pop(0)
+
+    cut = text[:max(1, limit - 3)]
+    # Prefer to break where the name already breaks, but not so far back that
+    # the label loses what identifies it: `group=refund-callback...` reads,
+    # `group=refund-callback-p...` looks like a rendering bug.
+    boundary = max(cut.rfind(char) for char in " -_./:")
+    if boundary >= int(limit * 0.55):
+        cut = cut[:boundary]
+    return cut.rstrip(" -_./:") + "..."
+
+
+_NON_ALNUM = re.compile(r"[^a-z0-9]+")
+
+
+def fingerprint(value: str) -> str:
+    """Case and punctuation removed, for comparing two spellings of one name."""
+    return _NON_ALNUM.sub("", str(value or "").lower())
+
+
+def echoes(part: str, name: str) -> bool:
+    """Does `part` just repeat `name` in different punctuation?
+
+    `REFUND_REQUEST_TOPIC` on an arrow pointing at a circle labelled
+    `payrx-core-refund-request-topic-local` tells the reader nothing they cannot
+    read off the circle, and it costs the width that made the diagram unreadable.
+    The 4-character floor keeps a genuinely short label (`sql`, `key`) from being
+    swallowed by a coincidence.
+    """
+    left, right = fingerprint(part), fingerprint(name)
+    if len(left) < 4 or not right:
+        return False
+    return left in right or right in left

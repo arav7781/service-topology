@@ -47,7 +47,7 @@ flowchart LR
   n8{{"orders.created"}}
 
   n2 -->|"redis"| n1
-  n2 -.->|"InventoryService"| n3
+  n2 -.->|"grpc"| n3
   n2 -->|"GET /orders"| n7
   n4 -->|"key=orderId"| n5
   n4 -->|"GET /orders/{id}"| n7

@@ -32,11 +32,11 @@ flowchart LR
   n5{{"orders.created"}}
 
   n1 -->|"redis"| n0
-  n1 -.->|"InventoryService"| n2
+  n1 -.->|"grpc"| n2
   n1 -->|"GET /orders"| n4
-  n4 -->|"orders.created<br/>key=orderID"| n5
-  n5 -->|"orders.created"| n1
-  n5 -->|"orders.created<br/>group=notifications"| n3
+  n4 -->|"key=orderID"| n5
+  n5 -->|"consumes"| n1
+  n5 -->|"group=notifications"| n3
 
   classDef service fill:#dae8fc,stroke:#6c8ebf,color:#10314f;
   classDef topic fill:#ffe6cc,stroke:#d79b00,color:#653700;
@@ -59,9 +59,12 @@ Three differences from the master are worth pointing at:
    `notifications-svc` appear even though `billing-svc` has no direct edge to
    the latter, because both sit on the other end of `orders.created`. A topic in
    isolation tells you nothing; who else is on it is the whole question.
-3. **Kafka edges gain the topic name.** In the master the topic is the box next
-   door; here the arrow carries `orders.created` as well, because a micro
-   topology is meant to be reviewable without cross-referencing anything.
+3. **The arrows say what the boxes cannot.** A label is a relationship name -
+   `key=orderID`, `group=notifications`, `GET /orders` - and never a repeat of
+   a name already written on the shape at either end. `n5 -->|"consumes"| n1`
+   says all there is to say: which topic, and which service, are the two boxes.
+   The untrimmed string is in the `.drawio` cell data and in
+   `evidence/sources.md`.
 
 ---
 

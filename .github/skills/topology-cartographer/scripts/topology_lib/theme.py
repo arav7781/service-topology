@@ -18,8 +18,9 @@ Two are shipped:
     for topics, diamonds for the processors between them, cylinders for state,
     off-page connectors for anything outside the system. Kind is carried by
     *shape*, not fill, so the diagram stays readable at several hundred nodes
-    and in either draw.io colour scheme. Shapes are fixed-size and small, and
-    the columns are spaced wide enough for a long topic name to overhang.
+    and in either draw.io colour scheme. Shapes are fixed-size and small, so a
+    name too long to sit inside one is wrapped and drawn underneath it, in
+    space `layout.py` reserves from the same numbers.
 
 ``classic``
     The label-fitted boxes this skill emitted before themes existed. Kept
@@ -31,8 +32,9 @@ Two are shipped:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
+from .textutil import wrap_label
 from .model import (
     EDGE_CALLS,
     EDGE_CONSUMES,
@@ -45,7 +47,7 @@ from .model import (
     KIND_TOPIC,
 )
 
-THEME_VERSION = "1.0.0"
+THEME_VERSION = "1.1.0"
 
 DEFAULT_THEME = "streams"
 
@@ -70,6 +72,24 @@ class Theme:
     # which is what `classic` does.
     node_sizes: Optional[Dict[str, Tuple[int, int]]] = None
 
+    # --- labels ---
+    # How many characters fit on one line of a node label, per kind. draw.io
+    # will not break `payrx-core-refund-request-topic-local` for us - there is
+    # no space in it to break on - so the renderer inserts the breaks itself and
+    # the layout counts the lines they produce. Both read these numbers.
+    label_chars: Dict[str, int] = field(default_factory=dict)
+    label_chars_default: int = 24
+    label_line_height: int = 13
+    label_char_width: int = 6
+    # Kinds whose label is drawn *below* the shape rather than inside it. A
+    # 37-character topic name has no business inside an 80-unit circle.
+    label_outside: Tuple[str, ...] = ()
+    label_gap: int = 6
+    # Longest arrow label, in characters. Past this the label is elided and the
+    # full text moves to the tooltip: an arrow label wider than the gap it sits
+    # in lands on the next arrow's label.
+    edge_label_chars: int = 28
+
     # --- edges ---
     edge_base: str = ""
     edge_colours: Dict[Tuple[str, str], str] = field(default_factory=dict)
@@ -89,6 +109,10 @@ class Theme:
     margin_x: int = 40
     margin_y: int = 40
     back_edge_channel: int = 60
+    # A band above the diagram for arrows that span more than one column. They
+    # used to be drawn straight, which on a wide diagram means straight through
+    # whatever boxes happen to sit between the two ends.
+    long_edge_channel: int = 70
 
     # --- legend ---
     legend_style: str = ""
@@ -104,6 +128,18 @@ class Theme:
             return None
         return self.node_sizes.get(kind) or self.node_sizes.get(KIND_SERVICE)
 
+    def wrap(self, kind: str, text: str) -> List[str]:
+        """The lines a node label is drawn on. The single source of both truths.
+
+        `layout.py` calls this to work out how much room to reserve and
+        `render.py` calls it to write the label; calling it twice is what keeps
+        the reserved space and the drawn text the same size.
+        """
+        return wrap_label(text, self.label_chars.get(kind, self.label_chars_default))
+
+    def labels_outside(self, kind: str) -> bool:
+        return kind in self.label_outside
+
 
 # --------------------------------------------------------------------------- #
 # streams - the Kafka Streams dataflow idiom
@@ -113,6 +149,13 @@ class Theme:
 # its own defaults, which follow the viewer's light/dark setting - a diagram
 # that hard-codes #ffffff is a white rectangle in a dark canvas.
 _STREAMS_LABEL = "verticalAlign=middle;align=center;"
+# A name too long for the shape it names goes *under* it. Inside an 80-unit
+# circle, `payrx-core-refund-request-topic-local` is drawn as one unbroken run
+# that overhangs the circle by a factor of three and lands on whatever is next
+# to it; underneath, wrapped, it is centred in space the layout reserved for it.
+_STREAMS_OUTSIDE_LABEL = (
+    "verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;"
+    "align=center;")
 _MONO = "fontFamily=Consolas, Courier New, monospace;"
 
 _STREAMS = Theme(
@@ -129,7 +172,7 @@ _STREAMS = Theme(
         # stretch it into an oval.
         KIND_TOPIC: (
             "ellipse;whiteSpace=wrap;html=1;aspect=fixed;"
-            + _MONO + "fontSize=9;" + _STREAMS_LABEL
+            + _MONO + "fontSize=9;" + _STREAMS_OUTSIDE_LABEL
         ),
         KIND_DATASTORE: (
             "shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;"
@@ -146,13 +189,13 @@ _STREAMS = Theme(
         # somewhere this diagram does not cover".
         KIND_EXTERNAL_API: (
             "shape=offPageConnector;whiteSpace=wrap;html=1;"
-            "fontSize=9;" + _STREAMS_LABEL
+            "fontSize=9;" + _STREAMS_OUTSIDE_LABEL
         ),
     },
     unresolved_topic_style=(
         "ellipse;whiteSpace=wrap;html=1;aspect=fixed;dashed=1;"
         "fillColor=none;strokeColor=#999999;fontColor=#666666;"
-        + _MONO + "fontSize=9;" + _STREAMS_LABEL
+        + _MONO + "fontSize=9;" + _STREAMS_OUTSIDE_LABEL
     ),
     referenced_only_service_style=(
         "rhombus;whiteSpace=wrap;html=1;dashed=1;"
@@ -166,6 +209,21 @@ _STREAMS = Theme(
         KIND_CACHE: (110, 95),
         KIND_EXTERNAL_API: (80, 80),
     },
+    # A diamond and a cylinder hold their own name; a circle does not, so a
+    # topic gets the wider line and is drawn underneath the shape instead.
+    label_chars={
+        KIND_SERVICE: 14,
+        KIND_TOPIC: 22,
+        KIND_DATASTORE: 13,
+        KIND_CACHE: 13,
+        KIND_EXTERNAL_API: 22,
+    },
+    label_chars_default=22,
+    label_line_height=12,
+    label_char_width=6,
+    label_outside=(KIND_TOPIC, KIND_EXTERNAL_API),
+    label_gap=6,
+    edge_label_chars=26,
     # No `edgeStyle`, so draw.io draws the direct line between two perimeter
     # points rather than an elbow. With circles and diamonds that is what makes
     # the flow read as flow.
@@ -188,6 +246,7 @@ _STREAMS = Theme(
     margin_x=60,
     margin_y=60,
     back_edge_channel=80,
+    long_edge_channel=90,
     legend_style=("text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;"
                   "rounded=1;fillColor=#ffffff;strokeColor=#b3b3b3;"
                   "fontSize=10;fontColor=#555555;"),
@@ -261,6 +320,13 @@ _CLASSIC = Theme(
         "fontSize=12;fontStyle=2;verticalAlign=middle;align=center;"
     ),
     node_sizes=None,
+    # No fixed sizes: the box is fitted to the label, so the wrap width is what
+    # decides how wide the box gets. 30 characters at 8 units lands just inside
+    # the 280-unit clamp in `layout.py`.
+    label_chars_default=30,
+    label_line_height=18,
+    label_char_width=8,
+    edge_label_chars=20,
     edge_base=("edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;"
                "orthogonalLoop=1;endArrow=blockThin;endFill=1;fontSize=10;"),
     edge_colours={
@@ -274,7 +340,9 @@ _CLASSIC = Theme(
     inferred_edge_extra=("strokeColor=#999999;fontColor=#8c8c8c;"
                          "dashed=1;dashPattern=6 6;"),
     pin_adjacent_edges=True,
-    column_gap=120,
+    # Wide enough for an arrow label to sit between two boxes rather than on
+    # one of them. A 20-character label is about 140 units at this font size.
+    column_gap=160,
     row_gap=40,
     margin_x=40,
     margin_y=40,

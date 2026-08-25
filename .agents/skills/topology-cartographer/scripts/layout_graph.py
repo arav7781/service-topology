@@ -6,7 +6,9 @@ Part of the Topology Cartographer skill (Phase 3: layout).
 The model never hand-computes coordinates, exactly as it never hand-computes a
 candidate score in contributor-scout. This script owns the arithmetic: it reads
 graph-model.json, lays out the master topology plus one micro topology per
-service, and writes the same model back with a `layout` block added.
+service, and writes the same model back with a `layout` block added. Pass
+`--no-master` to lay out only the micro topologies - what gets laid out here is
+what gets rendered later, so a mode that asked for one service stops here.
 
 Layout is a plain layered DAG placement implemented in the standard library -
 no graphviz, no external engine. Cycles are broken by a depth-first search over
@@ -18,6 +20,8 @@ Usage
     python3 layout_graph.py service-topology/graph-model.json \
         -o service-topology/graph-model.laid-out.json
     python3 layout_graph.py graph-model.json --service orders-svc --format summary
+    python3 layout_graph.py graph-model.json --service orders-svc --no-master \
+        -o service-topology/graph-model.laid-out.json
     python3 layout_graph.py --example
 
 Exit codes
@@ -65,9 +69,9 @@ EXAMPLE = {
             },
             "edges": [
                 {"index": 0, "from": "orders-svc", "to": "orders.created",
-                 "waypoints": []},
+                 "waypoints": [], "label_x": 0.0},
                 {"index": 1, "from": "orders.created", "to": "billing-svc",
-                 "waypoints": []},
+                 "waypoints": [], "label_x": 0.0},
             ],
             "edge_count": 2,
         },
@@ -89,6 +93,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--service", action="append", default=[], metavar="NAME",
         help="lay out micro topologies for these services only; repeatable "
              "(default: every service)")
+    parser.add_argument(
+        "--no-master", action="store_true",
+        help="lay out the micro topologies only. Someone who asked for one "
+             "service's topology asked for one diagram")
     parser.add_argument(
         "--theme", choices=THEME_NAMES, default=DEFAULT_THEME,
         help="shape and spacing vocabulary; a theme fixes node sizes, so it "
@@ -144,7 +152,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         print("error: the model has no nodes to lay out", file=sys.stderr)
         return 2
 
-    model.layout = layout_all(model, args.service or None, theme=args.theme)
+    model.layout = layout_all(model, args.service or None, theme=args.theme,
+                              include_master=not args.no_master)
 
     if args.format == "summary":
         payload = summarise(model.layout) + "\n"
