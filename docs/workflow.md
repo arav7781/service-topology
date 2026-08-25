@@ -62,15 +62,25 @@ Every binding the extractors can trace to a `file:line`, tagged `[CODE]` or
 phases, OpenAPI specs, connection strings, and the config files that hold the
 values code refers to by key.
 
-**Delegate on a large repository.** The `topology-extractor` subagent scans one
-subtree and returns a shard. Three thousand files never enter one context
-window, and the shards merge in phase 2.
+**Do not delegate by default.** The scanner is a single Python process doing
+regular expressions over files - most repositories finish in seconds, and one
+`--scope`-less run over the whole thing is almost always the right first move.
+Delegate to `topology-extractor` only when the repository is large enough that
+reading it yourself really is the expensive option: one subagent per subtree,
+shards merged in phase 2, never one subagent per service.
 
 **Check for absence, not just presence.** A service with `KafkaTemplate` on its
 classpath and no `produces` edge is a signal. So is an HTTP client import with
 no `calls` edge. Each is either a real absence or an extractor gap; say which
 you think it is and cite what made you think so. A silent gap is the one failure
 mode a reader cannot see.
+
+**A diagnosed gap is not a delegation trigger.** If you already know *why* an
+edge is missing - you read the call site and saw the pattern the extractor does
+not recognise - a subagent adds nothing: it would only re-read the same file to
+reach the conclusion you already reached. Fix the extractor pattern yourself, or
+report the gap; do not spend a fresh context window re-deriving what you already
+know.
 
 ---
 

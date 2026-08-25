@@ -209,6 +209,16 @@ A service with a `KafkaTemplate` on its classpath and no `produces` edge is a
 signal that an extractor missed something - say so rather than shipping the gap
 silently.
 
+**A diagnosed gap is not a delegation trigger.** If you have already read the
+call site and can see *why* the pattern was missed - a topic passed as a class
+constant instead of a literal, a wrapped producer, a custom publisher method -
+a custom agent adds nothing: it would re-read the same file to reach the conclusion
+you already reached, at the cost of a fresh context window and tens of
+thousands of tokens. At that point, either extend the extractor pattern
+yourself and re-run the one-process scan, or report the gap by name in the
+summary. Reserve `topology-extractor` for the subtree you have **not yet
+looked at**, where reading it yourself really is the expensive option.
+
 ### Phase 2 - Graph model
 
 ```bash
