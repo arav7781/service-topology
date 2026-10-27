@@ -1,55 +1,38 @@
 # Examples
 
-Worked output from Topology Cartographer.
+Real output from following the skill, not mockups. Each example keeps its
+output where a real run would put it - `<repo>/service-topology/` - and its
+ledger is checked in CI: every receipt has to resolve to a line in the files
+beside it.
 
-> **These are real output, not mockups.** Both documents were produced by
-> running the pipeline against [`fixture-mesh/`](fixture-mesh/), a small
-> synthetic three-service system that lives in this repository. Every file path
-> and line number in them resolves to a file you can open, and each document
-> ends with the commands that regenerate it.
-
-| File | Demonstrates |
+| Example | What it shows |
 |---|---|
-| [sample-master-topology.md](sample-master-topology.md) | The whole-system diagram: services, Kafka topics, REST and gRPC calls, external systems as leaves, and one `[INFERENCE]` edge rendered visibly differently from the nine `[CODE]` ones |
-| [sample-micro-topology.md](sample-micro-topology.md) | One service's neighbourhood as a strict subset of the master, the two-hop Kafka context, blast-radius analysis, and a base URL resolved across two files |
-| [fixture-mesh/](fixture-mesh/) | The synthetic repository both were generated from - Go, Python, and TypeScript services with a shared topic and a deliberately unresolvable gRPC stub |
+| [`fixture-mesh/`](fixture-mesh/) | Three services - Go, Python, TypeScript - one Kafka topic, REST callbacks and an unconfirmable gRPC stub. Five views from five questions, plus a draw.io file |
 
 ## What to look at
 
-**Visible uncertainty.** In `sample-master-topology.md`, the arrow to
-`Inventory` is dotted and its box is hollow before you read a word of prose. The
-one unconfirmed edge out of ten is legible from the picture alone, which is the
-property the whole evidence system exists to produce.
+- **Different questions, different diagrams.** Compare
+  [lineage](fixture-mesh/service-topology/views/lineage-orders.created.md)
+  with [impact](fixture-mesh/service-topology/views/impact-orders-svc.md).
+  Both come from the same ledger, but each keeps only what its question needs.
+- **Visible uncertainty.** In the
+  [overview](fixture-mesh/service-topology/views/overview.md), the arrow to
+  `InventoryService` is dashed, and its receipt row says why.
+- **Resolution across files.** `billing-svc`'s consumer group is a variable.
+  The ledger follows it to its env default and to `docker-compose.yml`, and
+  cites all three lines.
+- **Review with receipts.** The
+  [review](fixture-mesh/service-topology/views/review.md) finds that both
+  consumers call the producer back for every event, and proposes the smallest
+  fix - drawn separately, labelled PROPOSED.
 
-**One node, several citations.** `orders-db` was seen three times - a container
-image, a `depends_on`, and a connection string in Go. It is one box with three
-citations, not three near-duplicate boxes.
-
-**Honest gaps.** Both documents end with "what this diagram does not show",
-naming the consumer group read from a variable, the URL assembled by
-concatenation, and the `.proto` that lives elsewhere. A reader who knows what is
-missing can trust what is present.
-
-## Regenerating the examples
+## Checking an example yourself
 
 ```bash
-S=skills/topology-cartographer/scripts
-OUT=/tmp/topology-example
-
-python3 $S/scan_repository.py examples/fixture-mesh -o /tmp/scan.json
-python3 $S/build_graph_model.py --input /tmp/scan.json \
-    --output-root $OUT -o $OUT/graph-model.json \
-    --evidence-out $OUT/evidence/sources.md
-python3 $S/layout_graph.py $OUT/graph-model.json \
-    --output-root $OUT -o $OUT/graph-model.laid-out.json
-python3 $S/render_drawio.py $OUT/graph-model.laid-out.json \
-    --mode all --output-dir $OUT --output-root $OUT
-python3 $S/render_mermaid.py $OUT/graph-model.laid-out.json \
-    --mode all --output-dir $OUT --output-root $OUT
-python3 $S/validate_graph_model.py $OUT/graph-model.json \
-    --repo examples/fixture-mesh
+bash tools/check-ledger.sh examples/fixture-mesh \
+     examples/fixture-mesh/service-topology/topology.ledger
 ```
 
-Run the full pipeline twice into two directories and `diff -r` them: the output
-is byte-identical, which is the property that makes a diff between two runs a
-diff between two architectures.
+To regenerate one, open the fixture in your agent and ask the question in the
+view's title. Expect the same edges and receipts. The prose may differ, since
+an LLM wrote it.

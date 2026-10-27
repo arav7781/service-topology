@@ -1,0 +1,60 @@
+<mxfile host="topology-cartographer">
+  <diagram id="focus-billing-svc" name="What does billing-svc talk to?">
+    <mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" page="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <UserObject id="n1" label="InventoryService ?" kind="ref" receipts="services/billing/billing/inventory.py:14">
+          <mxCell style="whiteSpace=wrap;html=1;rounded=1;dashed=1;fillColor=none;strokeColor=#94a3b8;fontColor=#475569;" vertex="1" parent="1">
+            <mxGeometry x="760" y="40" width="160" height="60" as="geometry"/>
+          </mxCell>
+        </UserObject>
+        <UserObject id="n2" label="billing-cache" kind="cache" receipts="docker-compose.yml:37,38">
+          <mxCell style="whiteSpace=wrap;html=1;shape=cylinder3;size=12;fillColor=#f3e8ff;strokeColor=#9333ea;" vertex="1" parent="1">
+            <mxGeometry x="780" y="180" width="120" height="80" as="geometry"/>
+          </mxCell>
+        </UserObject>
+        <UserObject id="n3" label="billing-svc" kind="svc" receipts="services/billing/pyproject.toml:2; docker-compose.yml:15">
+          <mxCell style="whiteSpace=wrap;html=1;rounded=1;fillColor=#dbeafe;strokeColor=#2563eb;strokeWidth=3;" vertex="1" parent="1">
+            <mxGeometry x="520" y="40" width="160" height="60" as="geometry"/>
+          </mxCell>
+        </UserObject>
+        <UserObject id="n4" label="orders-svc" kind="svc" receipts="services/orders/go.mod:1; docker-compose.yml:4">
+          <mxCell style="whiteSpace=wrap;html=1;rounded=1;fillColor=#dbeafe;strokeColor=#2563eb;" vertex="1" parent="1">
+            <mxGeometry x="40" y="40" width="160" height="60" as="geometry"/>
+          </mxCell>
+        </UserObject>
+        <UserObject id="n5" label="orders.created" kind="topic" receipts="services/orders/kafka/producer.go:14">
+          <mxCell style="whiteSpace=wrap;html=1;shape=hexagon;perimeter=hexagonPerimeter2;size=0.15;fillColor=#ffedd5;strokeColor=#ea580c;fontFamily=monospace;" vertex="1" parent="1">
+            <mxGeometry x="290" y="40" width="140" height="60" as="geometry"/>
+          </mxCell>
+        </UserObject>
+        <UserObject id="e1" label="Reserve" tag="INFERENCE" receipts="services/billing/billing/inventory.py:14,15" note="stub is used, but no .proto or server registration is in the repository" tooltip="INFERENCE · services/billing/billing/inventory.py:14,15">
+          <mxCell style="html=1;rounded=1;endArrow=block;edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#94a3b8;" edge="1" parent="1" source="n3" target="n1">
+            <mxGeometry relative="1" as="geometry"/>
+          </mxCell>
+        </UserObject>
+        <UserObject id="e2" label="GET /orders/{id}" tag="CODE" receipts="services/billing/billing/orders_client.py:12,7; docker-compose.yml:18; services/orders/api/openapi.yaml:8" tooltip="CODE · services/billing/billing/orders_client.py:12">
+          <mxCell style="html=1;rounded=1;endArrow=block;edgeStyle=orthogonalEdgeStyle;strokeColor=#2563eb;" edge="1" parent="1" source="n3" target="n4">
+            <mxGeometry relative="1" as="geometry"/>
+          </mxCell>
+        </UserObject>
+        <UserObject id="e3" label="group=billing" tag="CODE" receipts="services/billing/billing/consumers.py:13,14,7; docker-compose.yml:19" tooltip="CODE · services/billing/billing/consumers.py:13">
+          <mxCell style="html=1;rounded=1;endArrow=block;edgeStyle=orthogonalEdgeStyle;strokeColor=#16a34a;" edge="1" parent="1" source="n5" target="n3">
+            <mxGeometry relative="1" as="geometry"/>
+          </mxCell>
+        </UserObject>
+        <UserObject id="e4" label="redis" tag="CODE" receipts="services/billing/billing/cache.py:5; docker-compose.yml:20,22" tooltip="CODE · services/billing/billing/cache.py:5">
+          <mxCell style="html=1;rounded=1;endArrow=block;edgeStyle=orthogonalEdgeStyle;strokeColor=#64748b;" edge="1" parent="1" source="n3" target="n2">
+            <mxGeometry relative="1" as="geometry"/>
+          </mxCell>
+        </UserObject>
+        <UserObject id="e5" label="key=orderID" tag="CODE" receipts="services/orders/kafka/producer.go:21,22,14" tooltip="CODE · services/orders/kafka/producer.go:21">
+          <mxCell style="html=1;rounded=1;endArrow=block;edgeStyle=orthogonalEdgeStyle;strokeColor=#ea580c;" edge="1" parent="1" source="n4" target="n5">
+            <mxGeometry relative="1" as="geometry"/>
+          </mxCell>
+        </UserObject>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

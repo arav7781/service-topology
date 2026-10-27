@@ -1,517 +1,316 @@
 <div align="center">
 
-<img alt="Topology Cartographer — from code to topology to diagrams. Evidence-first, traceable, deterministic. Works with Claude Code, GitHub Copilot, Cursor, and Antigravity." src="assets/banner.png" width="100%">
+<img alt="Topology Cartographer - from code to topology to diagrams. Evidence-first and traceable. Works with Claude Code, GitHub Copilot, Cursor, and Antigravity." src="assets/banner.png" width="100%">
 
 <br>
 
 [![License](https://img.shields.io/badge/license-MIT-0969da?style=flat-square)](LICENSE)
 [![CI](https://github.com/arav7781/service-topology/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arav7781/service-topology/actions/workflows/ci.yml)
-[![Hosts](https://img.shields.io/badge/hosts-Claude%20Code%20%C2%B7%20Copilot%20%C2%B7%20Cursor%20%C2%B7%20Antigravity-1a7f37?style=flat-square)](#supported-hosts)
-[![Python](https://img.shields.io/badge/python-3.8%2B-3572a5?style=flat-square)](#requirements)
-[![Dependencies](https://img.shields.io/badge/dependencies-0-1a7f37?style=flat-square)](skills/topology-cartographer/scripts/requirements.txt)
-[![Mode](https://img.shields.io/badge/mode-mapping--only-bf8700?style=flat-square)](#safety-model)
+[![Runtime](https://img.shields.io/badge/runtime-none%20%C2%B7%20pure%20Markdown-1a7f37?style=flat-square)](#zero-runtime)
+[![Hosts](https://img.shields.io/badge/hosts-Claude%20Code%20%C2%B7%20Copilot%20%C2%B7%20Cursor%20%C2%B7%20Antigravity-1a7f37?style=flat-square)](#install)
+[![Token budget](https://img.shields.io/badge/instructions-~7k%20tokens%2C%20CI--enforced-bf8700?style=flat-square)](#token-budget)
 
-**[Quick start](#quick-start)** · **[Hosts](#supported-hosts)** · **[Usage](#usage)** · **[What you get](#what-you-get)** · **[How it works](#how-it-works)** · **[Safety](#safety-model)** · **[Limitations](#limitations)**
+**Ask your codebase an architecture question. Get the one diagram that answers it - with a receipt on every arrow.**
+
+**[Install](#install)** · **[Ask](#ask-it-anything)** · **[What you get](#what-you-get)** · **[Review](#review-and-redesign)** · **[How it works](#how-it-works)** · **[Safety](#safety)** · **[Limitations](#limitations)**
 
 </div>
 
 ---
 
-Point Topology Cartographer at a repository and it tells you what actually
-talks to what — every Kafka producer and consumer, every REST and gRPC call,
-every external system — with every arrow tracing to a `path/to/file:LINE` you
-can open and check.
+Topology Cartographer is an agent skill. It teaches the coding agent you
+already use to read a repository's Kafka, RabbitMQ, SQS, NATS and Pub/Sub
+bindings, its REST, gRPC and GraphQL calls, and its datastores. It writes each
+connection down as one cited line, then draws the view your question needs:
+one service's neighbourhood, a topic's lineage, the blast radius of a change,
+a path between two services, or a review with a proposed fix.
 
-**It draws diagrams. It never guesses an arrow.**
+There is no Python, no Node, no MCP server and nothing to install. The skill is
+Markdown, and your agent's own search and read tools do the work.
+
+> *"Where does `orders.created` go?"*
+
+```mermaid
+flowchart LR
+  s_orders_svc["orders-svc"]
+  t_orders_created{{"orders.created"}}
+  s_billing_svc["billing-svc"]
+  s_notifications_svc["notifications-svc"]
+  t_notifications_sent{{"notifications.sent"}}
+
+  s_orders_svc -->|"key=orderID"| t_orders_created
+  t_orders_created -->|"group=billing"| s_billing_svc
+  t_orders_created -->|"group=notifications"| s_notifications_svc
+  s_notifications_svc -->|"key=orderId"| t_notifications_sent
+  s_billing_svc -->|"GET /orders/{id}"| s_orders_svc
+  s_notifications_svc -->|"GET /orders/{id}"| s_orders_svc
+
+  class s_orders_svc,s_billing_svc,s_notifications_svc svc
+  class t_orders_created,t_notifications_sent topic
+  classDef svc fill:#dbeafe,stroke:#2563eb,color:#0b2545
+  classDef topic fill:#ffedd5,stroke:#ea580c,color:#431407
+```
+
+Every arrow above comes from a line like this one, in a plain-text ledger the
+agent keeps beside your code:
 
 ```text
-   ┌──── extract ─────┐   ┌──── one cited graph ────┐   ┌── render ──┐
-   │ @KafkaListener   │   │  services · topics      │   │  .drawio   │
-   │ kafkaTemplate    │──▶│  edges, each with a     │──▶│  .mmd      │
-   │ requests · axios │   │  file:line and a tag    │   │  evidence  │
-   │ .proto · openapi │   └─────────────────────────┘   └────────────┘
-   │ application.yml  │      unresolved targets are          ▲
-   └──────────────────┘      dropped, not guessed  ──────────┘
+E billing-svc sub orders.created | group=billing | CODE | services/billing/billing/consumers.py:13,14,7; docker-compose.yml:19 | group from env BILLING_GROUP_ID, default billing
 ```
 
-<details>
-<summary><b>Contents</b></summary>
+That's the [real output](examples/fixture-mesh/service-topology/views/lineage-orders.created.md)
+for the bundled [`fixture-mesh`](examples/fixture-mesh/). Its
+[ledger](examples/fixture-mesh/service-topology/topology.ledger) is checked in
+CI, and every receipt resolves to a real line.
 
-- [Why it exists](#why-it-exists)
-- [What it does not do](#what-it-does-not-do)
-- [Core capabilities](#core-capabilities)
-- [Supported hosts](#supported-hosts)
-- [Quick start](#quick-start)
-- [Installation](#installation)
-- [Usage](#usage)
-- [What you get](#what-you-get)
-- [How it works](#how-it-works)
-- [The human workflow](#the-human-workflow)
-- [Safety model](#safety-model)
-- [Limitations](#limitations)
-- [Troubleshooting](#troubleshooting)
-- [Project structure](#project-structure)
-- [Contributing](#contributing)
-- [Roadmap](#roadmap)
-- [Licence](#licence)
+## Why it's different
 
-</details>
-
----
-
-## Why it exists
-
-An event-driven system's structure is spread across the thing it describes. A
-topic name appears in a Go producer, a Python consumer, a third service's
-`application.yml`, and a Terraform resource in another repository — and no
-single file states the relationship that matters. So diagrams get drawn by
-hand, drift within weeks, and get replaced by the knowledge of whoever has
-been there longest.
-
-Ask an assistant to draw it instead and you get something plausible, partly
-invented, with no way to tell which parts. This tool exists because the fix is
-structural: every arrow cites a line, and the arrows that could not be
-resolved are drawn **dashed and grey** so you can see the uncertainty in the
-picture rather than take it on faith.
-
-## What it does not do
-
-- **No custom renderer.** `.drawio` is already rendered by an extension that
-  works in VS Code, Cursor, and Antigravity. Building a webview would be a
-  worse version of a solved problem.
-- **No LLM-written XML.** Generation is a deterministic script, from a
-  structured input. A model hand-writing mxGraph is the same failure one layer
-  down.
-- **No runtime observation.** No broker connection, no service registry, no
-  distributed trace. A live environment is not evidence you can cite, and this
-  tool was never authorised to touch one.
-- **No guessed edges.** A call whose target does not resolve is left out. A
-  missing arrow is a gap a reader can detect; a wrong arrow is not.
-- **No writing to the analysed repository** — including its `.gitignore`.
-- **No implementation.** It reports the topology it finds. Redesigning the
-  system is a separate, human decision.
-
-## Core capabilities
-
-| | |
-|---|---|
-| **Kafka, five ecosystems** | Spring Kafka, Kafka Streams and the JVM client · kafka-python, confluent-kafka, aiokafka, faust · kafkajs, node-rdkafka, NestJS · segmentio/kafka-go, sarama · Spring Cloud Stream bindings |
-| **Synchronous calls** | OpenAPI specs · `.proto` plus generated-stub usage · requests/httpx · axios/fetch/got · RestTemplate/WebClient/OkHttp/Feign · net/http, resty |
-| **Config resolution** | A topic named `${app.topics.orders}` is followed into `application.yml`, `.env`, docker-compose, Helm values, or Terraform — and stays `[CODE]`, because both ends were read |
-| **Two levels of detail** | One master topology for the whole system; one micro topology per service, with message keys, consumer groups, and method+path |
-| **Labels that stay legible** | Names are wrapped to what the shape can hold and drawn below it when it cannot; arrow labels are short relationship names, slid clear of each other and of every node. The full string lives in the cell data and the evidence report |
-| **Visible uncertainty** | `[CODE]` renders solid; `[INFERENCE]` renders dashed grey, carries a written reason, and is listed separately |
-| **Evidence inside the file** | Every node and edge is a `UserObject` — select an arrow in draw.io, `Edit > Edit Data`, and read its source location |
-| **Byte-identical re-runs** | No timestamps, content-hashed diagram ids, total ordering everywhere. A diff of two runs is a diff of two architectures |
-| **Zero dependencies** | Subset-YAML instead of PyYAML, a layered DAG placement instead of graphviz, `ElementTree` instead of string-formatted XML |
-
-## Supported hosts
-
-| Host | How it runs | Rendering |
+| | Ask an agent to "draw the architecture" | Topology Cartographer |
 |---|---|---|
-| **Claude Code** | Native skill (`skills/topology-cartographer/`) | `.drawio` via the `hediet.vscode-drawio` extension when Claude Code runs inside VS Code; `.mmd` fallback always |
-| **GitHub Copilot** | Native skill (`.github/skills/topology-cartographer/`) | Runs inside VS Code, so the same extension previews the `.drawio` once it lands on disk |
-| **Cursor** | Skill (`.cursor/skills/`) + MCP server | Same extension, from Cursor's marketplace or OpenVSX |
-| **Antigravity** | Skill (`.agents/skills/`) + MCP server | Same extension; Antigravity is a VS Code-compatible extension host |
+| **Evidence** | Plausible, partly invented, no way to tell which part | Every arrow cites `file:line`; anything unconfirmed is drawn **dashed** and says why |
+| **Shape** | The same big picture whatever you asked | A view fitted to the question - focus, lineage, path, impact, deps, data, diff, review |
+| **Memory** | Re-reads the repo every time | A sorted, cited ledger that later questions answer from; refreshed only for files git says changed |
+| **Change** | Nothing to compare | `git diff` of the ledger is an architecture diff - review it in the PR |
+| **Design** | Opinions | Twelve topology smells, each proven by ledger lines, and an optional to-be diagram kept apart from the as-is |
+| **Cost** | Unbounded | About 7k tokens of instructions for a first question, 3.8k for a follow-up, enforced in CI |
 
-Cursor and Antigravity get both a skill tree and an MCP server: the skill gives
-their agent the workflow and the hard constraints, the server gives it
-callable tools. Neither alone is enough — see
-[Installation](#installation).
+<a id="zero-runtime"></a>
+**Zero runtime.** v1 was a Python pipeline. If the interpreter was missing -
+or `python3` opened the Windows Store - nothing worked, and the agent was a
+script runner forbidden to think. v2 is instructions only. The agent resolves
+what regexes can't: wrapped clients, cross-file constants, addresses set in
+Kubernetes and read in code. The receipts rules keep it honest.
 
-## Quick start
+## Install
 
-```bash
-S=skills/topology-cartographer/scripts
-
-python3 $S/scan_repository.py /path/to/repo --format summary      # who is here?
-python3 $S/scan_repository.py /path/to/repo -o /tmp/scan.json
-python3 $S/build_graph_model.py --input /tmp/scan.json \
-    -o service-topology/graph-model.json \
-    --evidence-out service-topology/evidence/sources.md
-python3 $S/layout_graph.py service-topology/graph-model.json \
-    -o service-topology/graph-model.laid-out.json
-python3 $S/render_drawio.py service-topology/graph-model.laid-out.json \
-    --mode all --output-dir service-topology        # add --no-master for micros only
-python3 $S/render_mermaid.py service-topology/graph-model.laid-out.json \
-    --mode all --output-dir service-topology
-python3 $S/validate_graph_model.py service-topology/graph-model.json \
-    --repo /path/to/repo
-```
-
-Or just say it: *"use the topology-cartographer skill in scan mode on this
-repository"*. Start with `scan` — it is cheap, and its service list is what
-tells you which micro topology is worth generating first.
-
-Try it on the bundled fixture without any repository of your own:
-
-```bash
-python3 skills/topology-cartographer/scripts/scan_repository.py \
-    examples/fixture-mesh --format summary
-```
-
-### Requirements
-
-- Python 3.8 or later. Nothing else — the scripts are standard-library only.
-- To *view* a `.drawio` file: the `hediet.vscode-drawio` extension in VS Code,
-  Cursor, or Antigravity. Not required to generate one, only to see it
-  rendered instead of as raw XML.
-
-## Installation
-
-### Claude Code
-
-**Option A — as a plugin.** Add this repository as a marketplace and install
-the plugin:
+**Claude Code** - as a plugin:
 
 ```text
 /plugin marketplace add arav7781/service-topology
 /plugin install topology-cartographer@arav7781
 ```
 
-**Option B — clone and point at it directly.** Clone this repository anywhere,
-then reference `skills/topology-cartographer/SKILL.md` from your project's
-`CLAUDE.md`, or copy the `skills/topology-cartographer/` directory into your
-own project's `.claude/skills/`.
-
-**Option C — global skill.** Copy `skills/topology-cartographer/` into
-`~/.claude/skills/topology-cartographer/` to make it available in every
-project.
-
-### GitHub Copilot
-
-Copy `.github/skills/topology-cartographer/` and
-`.github/agents/{topology-extractor,graph-layout-validator}.agent.md` into the
-repository you want to invoke Copilot from — Copilot Chat reads skills from
-`.github/skills/` in the current workspace.
-
-### Cursor and Antigravity
-
-Both need the skill tree *and* the MCP server:
-
-1. Copy `.cursor/skills/topology-cartographer/` (or `.agents/skills/…` for
-   Antigravity) and the matching `agents/*.md` files into your project.
-2. Point the host's MCP config at this checkout:
-
-| Host | Config file | Points at |
-|---|---|---|
-| Cursor | `.cursor/mcp.json` | `mcp-server/topology_mcp_server.py` |
-| Antigravity | `.agents/mcp_config.json`, or `~/.gemini/config/mcp_config.json` globally | `mcp-server/topology_mcp_server.py` |
-
-This repository's own `.cursor/mcp.json` and `.agents/mcp_config.json` already
-point at `mcp-server/` via `${workspaceFolder}`, which only resolves correctly
-when *this* repository is the open workspace. To use the server from a
-different repository, copy the block and replace `${workspaceFolder}` with an
-absolute path to this checkout:
-
-```json
-{
-  "mcpServers": {
-    "topology-cartographer": {
-      "command": "python3",
-      "args": ["/ABSOLUTE/PATH/TO/service-topology/mcp-server/topology_mcp_server.py"]
-    }
-  }
-}
-```
-
-Full detail, including the four MCP tools and their arguments:
-[mcp-server/README.md](mcp-server/README.md).
-
-### Rendering, all hosts
-
-Install `hediet.vscode-drawio` in VS Code, Cursor, or Antigravity.
-[`.vscode/extensions.json`](.vscode/extensions.json) recommends it and your
-editor will prompt on open. **Recommend, never auto-install** — extensions do
-not uniformly have permission to install other extensions across these hosts.
-
-### 60 seconds to a first run
-
-```bash
-git clone https://github.com/arav7781/service-topology
-cd service-topology
-python3 skills/topology-cartographer/scripts/scan_repository.py \
-    examples/fixture-mesh --format summary
-```
-
-## Usage
-
-| Mode | What it does |
+| Host | Copy into the repository you want to map |
 |---|---|
-| `scan` | Extract bindings and build the graph model. No diagrams. **Run this first.** |
-| `master` | The whole-system diagram |
-| `micro <service>` | One service's neighbourhood, two hops through the topics it touches |
-| `all` | Master plus one micro topology per service |
-| `refresh` | Re-scan and re-render after code changes |
+| GitHub Copilot | `.github/skills/topology-cartographer/` and `.github/agents/*.agent.md` |
+| Cursor | `.cursor/skills/topology-cartographer/` and `.cursor/agents/*.md` |
+| Antigravity | `.agents/skills/topology-cartographer/` and `.agents/agents/*.md` |
+| Any other agent | `skills/topology-cartographer/` anywhere, plus one line in your `AGENTS.md`: *"For architecture or topology questions, follow `skills/topology-cartographer/SKILL.md`."* |
 
-The mode is the deliverable: ask for one service's micro topology and that is
-the only diagram you get. `--no-master` on `layout_graph.py`,
-`render_drawio.py` and `render_mermaid.py` is the switch that enforces it when
-you are driving the scripts yourself.
+To view diagrams, GitHub and GitLab render the Mermaid in `.md` views as-is.
+In VS Code, Cursor or Antigravity, use the Markdown preview with
+[`bierner.markdown-mermaid`](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid);
+ask for draw.io and open the `.drawio` with
+[`hediet.vscode-drawio`](https://marketplace.visualstudio.com/items?itemName=hediet.vscode-drawio).
+[`.vscode/extensions.json`](.vscode/extensions.json) recommends both.
 
-> *"Use the topology-cartographer skill in scan mode."*
-> *"Which services consume `orders.created`?"*
-> *"Draw me the micro topology for billing-svc."*
-> *"What breaks if I change the key on `orders.created`?"*
+## Ask it anything
 
-If the repository has more than roughly 5,000 source files, or `scan` reports
-more than 25 services, the skill asks which subsystems to focus on before
-running `all` — twenty-five micro topologies nobody asked for is not a
-deliverable.
+Plain language works; the skill routes the question to a **lens**. In Claude
+Code you can also call it directly: `/topology-cartographer impact orders-svc`.
+
+| You ask | Lens | You get |
+|---|---|---|
+| *"What does billing-svc talk to?"* | `focus` | The service, its neighbours, and who's on the other side of its topics |
+| *"Who consumes `orders.created`?"* | `lineage` | Producers → topic → consumers → what they emit next |
+| *"How does the gateway reach Stripe?"* | `path` | Every path, as a sequence diagram when it's all sync |
+| *"What breaks if I change orders-svc?"* | `impact` | Direct dependents in red, transitive ones in amber |
+| *"What does checkout need to run?"* | `deps` | Everything it depends on, three hops deep |
+| *"Which services share a database?"* | `data` | Services and stores, shared stores flagged |
+| *"Map this repo"* | `overview` | The whole system, clustered past 30 nodes |
+| *"What changed in the architecture in this PR?"* | `diff` | Added edges thick, removed edges crossed out |
+| *"Review this design, what should we fix?"* | `review` | A health line, findings with receipts, an optional to-be diagram |
+
+Anything else gets a custom view, with its selection rule stated in the header.
+The same question twice refreshes the same file; a new question gets its own.
 
 ## What you get
 
 ```text
 service-topology/
-├── master-topology.drawio        the whole system
-├── master-topology.mmd           Mermaid fallback, same content
-├── graph-model.json              the structured source of truth
-├── graph-model.laid-out.json     the model plus diagram coordinates
-├── micro/
-│   ├── orders-svc.drawio         one service's direct neighbourhood
-│   └── orders-svc.mmd
-└── evidence/
-    └── sources.md                 every edge's tag and file:line
+├── topology.ledger                  every fact, one cited line each - the cache and the source of truth
+└── views/
+    ├── lineage-orders.created.md    the answer, the diagram, the receipts, the gaps
+    ├── impact-orders-svc.md
+    └── focus-billing-svc.drawio     only when you ask for draw.io
 ```
 
-Worked output, generated from the bundled fixture and regenerable by anyone:
-**[examples/sample-master-topology.md](examples/sample-master-topology.md)**
-and
-**[examples/sample-micro-topology.md](examples/sample-micro-topology.md)**.
+The [fixture-mesh output](examples/fixture-mesh/service-topology/) has five
+views from five questions -
+[overview](examples/fixture-mesh/service-topology/views/overview.md),
+[focus](examples/fixture-mesh/service-topology/views/focus-billing-svc.md),
+[lineage](examples/fixture-mesh/service-topology/views/lineage-orders.created.md),
+[impact](examples/fixture-mesh/service-topology/views/impact-orders-svc.md) and
+[review](examples/fixture-mesh/service-topology/views/review.md) - plus a
+[draw.io file](examples/fixture-mesh/service-topology/views/focus-billing-svc.drawio).
+The views share one ledger, but each one is shaped by its question.
 
-### What a diagram actually shows
+### The ledger
 
-The default `streams` theme draws the Kafka Streams dataflow idiom, where
-**kind is carried by shape rather than by fill** — at three hundred nodes a
-reader never stops telling a circle from a diamond, and leaving fill unset lets
-the diagram follow draw.io's own light or dark setting.
+```text
+# topology.ledger v2 · repo=fixture-mesh · commit=none · scopes=all
+N orders.created topic kafka | services/orders/kafka/producer.go:14
+E billing-svc grpc InventoryService | Reserve | INFERENCE | services/billing/billing/inventory.py:14,15 | stub is used, but no .proto or server registration is in the repository …
+E orders-svc pub orders.created | key=orderID | CODE | services/orders/kafka/producer.go:21,22,14
+G InventoryService | owner unknown - the .proto is generated at deploy time from another repository … | services/billing/billing/inventory.py:3
+```
 
-- **Circle** — a Kafka topic
-- **Grey dashed circle** — a topic whose name is an unresolved config reference
-- **Diamond** — a service, the processor between two topics
-- **Grey dashed diamond** — a service known only because something calls it,
-  with no manifest found in this repository
-- **Cylinder** — a datastore (purple: a cache)
-- **Off-page connector** — an external API
-- **Solid arrow** — `[CODE]`, read directly
-- **Dashed grey arrow** — `[INFERENCE]` or `[UNVERIFIED]`, not confirmed
+One fact per line, sorted byte-wise, receipts relative to the repo root:
 
-Pass `--theme classic` to `layout_graph.py` and `render_drawio.py` for the
-label-fitted boxes this skill drew before themes existed — blue service, orange
-topic hexagon, grey external cloud — which is more compact for a small graph.
-A theme fixes node sizes as well as styles, so the layout stamps its theme into
-the model and the renderers follow it; see
-[drawio-xml-spec.md](skills/topology-cartographer/references/drawio-xml-spec.md).
+- **For you:** commit it, and every PR that rewires a service shows up as a
+  one-line diff.
+- **For the agent:** it's the cache. A follow-up question reads about 150
+  bytes per edge instead of re-searching the repository. After a pull, only
+  lines citing changed files are re-swept.
+- **For CI:** [`tools/check-ledger.sh`](tools/check-ledger.sh) fails the build
+  if a receipt points past the end of its file, an edge has no declared
+  endpoint, or an inferred edge has no reason.
+
+### Evidence you can see
+
+| Tag | Meaning | Drawn |
+|---|---|---|
+| `CODE` | The binding and its target were read - a literal, or a symbol followed to a concrete value with every file on the chain cited | solid |
+| `INFERENCE` | The pattern matched but the target is only probable - an unresolved `${KEY}`, a stub with no `.proto` | dashed, with a reason |
+| `UNVERIFIED` | Asserted by a person or a helper, not confirmed by reading | dashed |
+
+A call whose target can't be named isn't drawn at all. It becomes a `G` (gap)
+line. A missing arrow is a gap you can see; a wrong arrow is an error you can't.
+
+## Review and redesign
+
+Ask for a review and the skill runs [twelve topology checks](skills/topology-cartographer/references/smells.md)
+over the ledger: sync cycles, event-then-callback, shared stores, orphan
+channels, deep sync chains, hubs, chatty pairs, hard-wired endpoints, unkeyed
+events, event ping-pong, unowned contracts and inference debt. Every finding
+lists the ledger lines that prove it.
+
+```text
+services 3 (+1 referenced) · edges 10 · CODE 90% · max sync depth 2 · sync cycles 0 · shared stores 0 · findings 0 high / 2 med / 2 low / 1 info
+```
+
+| Id | Sev | Finding | Evidence |
+|---|---|---|---|
+| T2 | med | billing-svc consumes `orders.created`, then calls orders-svc for the order | `E billing-svc sub orders.created` · `E billing-svc http orders-svc` |
+
+If you ask how to improve it, you get a second diagram titled **PROPOSED - not
+in the code**. Each proposal fixes a named finding with as few edge changes as
+possible, comes with expand → migrate → contract steps and risks, and shows the
+health line it would leave behind.
+[Full example](examples/fixture-mesh/service-topology/views/review.md).
+Nothing is ever applied to your code.
 
 ## How it works
 
-Six phases, each with an artefact and a gate — the full version is
-[docs/workflow.md](docs/workflow.md):
+```mermaid
+flowchart LR
+  Q["your question"] --> R["route to a lens"]
+  R --> L{"ledger fresh?"}
+  L -- yes --> D["draw the view"]
+  L -- no --> S["sweep: one search per family"]
+  S --> V["resolve: literal → env → config → constant → wrapper"]
+  V --> W["write cited ledger lines"]
+  W --> D
+  D --> C["self-check, then answer in ≤ 10 lines"]
+```
 
-| Phase | Produces | Gate |
+1. **Route** the question to a lens. The lens decides how much of the repo
+   needs reading: `focus` and `lineage` read the subject plus one echo search;
+   only `overview`, `impact`, `data` and `review` read everything.
+2. **Ledger first.** If `service-topology/topology.ledger` exists and matches
+   `HEAD`, answer from it. If not, re-sweep only the files git says changed.
+3. **Sweep** with [signatures](skills/topology-cartographer/references/signatures.md):
+   - one **address sweep** over compose, Kubernetes and Helm (`*_ADDR`,
+     `*_URL`, `*_TOPIC`…) - usually the whole wiring in a single search;
+   - then one combined regex per family - messaging, HTTP/gRPC/GraphQL,
+     datastores - gated on what the manifests import;
+   - then one **echo** search for every name found so far, to catch wrappers
+     and constants files.
+4. **Resolve** each hit with a fixed ladder - literal, same-file default,
+   config, cross-file constant, wrapper - or record a gap.
+5. **Draw** the lens with fixed [Mermaid conventions](skills/topology-cartographer/references/lenses.md):
+   kind by shape, evidence by dash. Draw.io is [opt-in](skills/topology-cartographer/references/drawio.md).
+
+Hosts that support helper agents can split large monorepos (over 25 services)
+across [`topology-extractor`](agents/topology-extractor.md) helpers, which
+return ledger lines and nothing else. Before you share a diagram,
+[`topology-verifier`](agents/topology-verifier.md) re-reads the receipts and
+tries to prove the diagram wrong.
+
+<a id="token-budget"></a>
+### Token budget
+
+Measured file sizes (tokens ≈ bytes ÷ 4); [`tools/token-budget.sh`](tools/token-budget.sh)
+fails CI if any file outgrows its budget.
+
+| Instructions loaded | v1 (Python pipeline) | v2 |
 |---|---|---|
-| 0 Scope and boundaries | Service list, one of three decisions | Are these the right services? |
-| 1 Extraction | Cited facts, `[CODE]` or `[INFERENCE]` | Large repository — which subsystems? |
-| 2 Graph model | `graph-model.json`, `evidence/sources.md` | `scan` mode ends here |
-| 3 Layout | Deterministic coordinates | — |
-| 4 Render | `.drawio` and `.mmd` | — |
-| 5 Validation | Every citation re-read against the code | Does this match how the system behaves? |
+| Always in context (skill description) | ~200 | ~200 |
+| First question on a repository | ~13,100 (SKILL + 5 required playbooks) | ~7,200 (SKILL + signatures + lenses) |
+| Follow-up question | ~13,100, plus a re-scan | ~3,800 (SKILL + lenses), answered from the ledger |
+| Review | - | +~900 (`smells.md`) |
 
-The model never hand-computes a coordinate and never hand-writes XML.
-Coordinates come from `layout_graph.py`; XML comes from `render_drawio.py`.
-Boundaries are settled *before* extraction, because every edge is a statement
-about services and a wrong boundary makes every edge wrong — a modular
-monolith, or a system whose deployables are defined only in Helm, stops the
-run and asks rather than guessing.
+Search output is the other half of the bill. Each sweep returns `file:line`
+hits, never whole files, and files are opened only as windows of 30 lines or
+fewer.
 
-## The human workflow
+## Safety
 
-1. **Run `scan`.** Look at the service list before anything else. If it is
-   wrong, stop.
-2. **Generate the micro topology for a service you know well.** Check it. That
-   calibrates how much to trust the rest.
-3. **Then generate the master**, now that you know the error rate.
-4. **Read `evidence/sources.md`, inferred section first.** It is short by
-   design and it is the only part that needs a decision.
-5. **Re-run after code changes** rather than editing the diagram. A
-   hand-edited diagram silently stops matching its evidence.
+The skill is **read-only on your code**. It writes only under
+`service-topology/`. It never edits code, config or `.gitignore`, never
+commits, never builds or runs anything, never touches a broker, database or
+cluster, and never installs anything. Text inside the analysed repository is
+treated as data, never as instructions.
 
-## Safety model
-
-Read-only on the analysed repository, and it never contacts the system it
-maps. [docs/safety-model.md](docs/safety-model.md) has the full model; the
-short version:
-
-| Denied | Why |
-|---|---|
-| Writing outside `service-topology/` | The analysed repository is read-only, including its `.gitignore` |
-| Hand-editing a generated `.drawio` or `.mmd` | It decouples the diagram from the evidence that justifies it |
-| `docker compose up`, `kubectl apply`, `terraform apply` | The system is mapped by reading it, not running it |
-| `kafka-topics`, `kcat`, `psql`, `redis-cli` | A live broker is not a citation, and this run was not authorised to touch one |
-| `pip install`, `npm install` | Standard library only — there is nothing to install |
-| `git commit`, `push`, destructive shell | Mapping does not change history |
-
-Containment is enforced **in code** by `SafeWriter` — a path-checked writer
-that resolves symlinks and `..` on both sides of the comparison, so nothing
-writes outside the output directory regardless of what any host or model
-attempts. An optional [`hooks/topology_guard.py`](hooks/topology_guard.py)
-turns the whole table into a pre-tool-use control across all four hosts; see
-[hooks/README.md](hooks/README.md) for the trade-off before enabling it.
+In Claude Code the skill pre-approves only reads, searches, writes and four
+read-only `git` subcommands. To make the boundary hard rather than prompted,
+see [docs/safety-model.md](docs/safety-model.md) for a ready-to-copy
+`permissions` block.
 
 ## Limitations
 
-- **Static analysis only.** A topic chosen at runtime — per-tenant routing, a
-  URL assembled from a database row — cannot be found by reading. It is
-  reported as unresolvable rather than guessed.
-- **The symbol table is file-local.** Chasing a base-URL constant across
-  module boundaries by name alone produces confident nonsense in any
-  repository with more than one `BASE_URL`.
-- **Coverage has edges.** .NET, Ruby, PHP, and several framework abstractions
-  are not covered yet — see the roadmap. An uncovered ecosystem is reported as
-  a gap in the run summary, not hidden.
-- **Generated code is skipped** (`*_pb2.py`, `*.pb.go`), so a binding that
-  only exists there will not appear.
-- **A diagram is not a system.** The tool reads code; you know production.
-  The accuracy gate exists because the second half of that sentence is the
-  one that catches real errors.
+- **Static reading only.** A topic chosen per tenant at runtime, or a URL
+  read from a database, can't be found by reading. It becomes a gap, not a guess.
+- **LLM-driven, so not byte-deterministic.** v1's regex pipeline produced
+  identical bytes on every run. v2 fixes the search recipes, resolution ladder,
+  ledger grammar and sort order, so runs agree on what they find. But an agent
+  can still find more or less in a hard case, which is why every line carries
+  a receipt and CI checks them.
+- **Receipts are line numbers.** They drift as code moves. A refresh re-cites
+  every changed file, and `check-ledger.sh` catches receipts that fall off the
+  end of a file.
+- **Coverage is the signature table.** Ecosystems without a row - Elixir,
+  Erlang, some framework abstractions - are reported as gaps.
+- **A diagram isn't the system.** It shows what the code says. Spot-check the
+  edges around a service you know before you trust the rest.
 
-## Troubleshooting
+## Migrating from v1
 
-<details>
-<summary>The .drawio file opens as raw XML</summary>
-
-The `hediet.vscode-drawio` extension is not installed, or the editor is not a
-VS Code-family host. Install it and reopen the file — it renders on open, with
-no command to run. In a surface with no file view at all, use the `.mmd`.
-</details>
-
-<details>
-<summary>My Kafka client library was not recognised</summary>
-
-Check
-[kafka-extraction-playbook.md](skills/topology-cartographer/references/kafka-extraction-playbook.md)
-for what is covered. If your library is genuinely missing, that is worth
-reporting — and worth fixing in the playbook and the extractor rather than by
-hand-adding an edge to the model, which the next run would overwrite.
-</details>
-
-<details>
-<summary>The service boundaries are wrong</summary>
-
-Phase 0 should have stopped and asked. Use `--scope` to name the directories
-that really are services, and see
-[service-boundary-heuristics.md](skills/topology-cartographer/references/service-boundary-heuristics.md).
-A repository whose deployables are defined only in Kubernetes manifests
-always needs this.
-</details>
-
-<details>
-<summary>The repository is too large, or the diagram is unreadable</summary>
-
-`--scope services/orders,services/billing` produces a readable diagram of the
-part that matters. A forty-service master topology is honest and unreadable;
-two eight-service ones are honest and useful. Micro topologies are the other
-answer — that is why the mode exists.
-</details>
-
-<details>
-<summary>The MCP server will not connect</summary>
-
-Run it by hand: `python3 mcp-server/topology_mcp_server.py --version`. If that
-works, the path in your config is wrong — `${workspaceFolder}` expands to the
-*open* workspace, so a different repository needs an absolute path. Check
-that `python3` is on the host's `PATH`, which is not always your shell's.
-More in [mcp-server/README.md](mcp-server/README.md).
-</details>
-
-<details>
-<summary>A topic node is labelled "(unresolved)"</summary>
-
-The code refers to the topic by a config key whose value is not in the
-repository — usually set by a deployment pipeline. That is a genuine finding,
-not a bug: the topic name is not knowable from this code alone. The edge is
-tagged `[INFERENCE]` and says so.
-</details>
-
-## Project structure
-
-```text
-service-topology/
-├── README.md
-├── LICENSE                          MIT
-├── CONTRIBUTING.md                  how to contribute; the verification battery
-├── Service_Topology_Mapping_Plan.md design source of truth
-├── .claude-plugin/                  plugin + marketplace manifests
-│
-├── skills/topology-cartographer/    ← CANONICAL skill payload (Claude Code)
-│   ├── SKILL.md                     phases, hard constraints, modes, gates
-│   ├── references/                  7 extraction and rendering playbooks
-│   ├── templates/                   4 schema and summary templates
-│   └── scripts/                     6 stdlib-only entry points + topology_lib/
-├── agents/                          2 Claude Code subagent definitions
-│
-├── .github/                         GitHub Copilot equivalents + CI
-│   ├── skills/topology-cartographer/
-│   ├── agents/*.agent.md
-│   └── workflows/ci.yml             the verification battery, on every push/PR
-├── .cursor/                         Cursor equivalents
-│   ├── skills/topology-cartographer/
-│   ├── agents/*.md
-│   └── mcp.json                     MCP server registration
-├── .agents/                         Antigravity equivalents
-│   ├── skills/topology-cartographer/
-│   ├── agents/*.md
-│   └── mcp_config.json              MCP server registration
-├── .vscode/
-│   ├── extensions.json              recommends hediet.vscode-drawio
-│   └── mcp.json                     MCP server registration
-│
-├── mcp-server/                      MCP layer for Cursor · VS Code · Antigravity
-│   ├── topology_mcp_server.py       4 tools, JSON-RPC over stdio, stdlib only
-│   └── test_client.py               a real MCP client, run in CI
-├── hooks/                           optional guard hook, all four hosts
-├── tools/sync_hosts.py              drift check across the four host trees
-├── examples/                        worked output + the fixture it came from
-│   ├── sample-master-topology.md
-│   ├── sample-micro-topology.md
-│   └── fixture-mesh/                3 synthetic services, Go · Python · TypeScript
-└── docs/
-    ├── architecture.md
-    ├── workflow.md
-    ├── output-format.md
-    ├── safety-model.md
-    └── implementation-roadmap.md
-```
-
-The [planning document](Service_Topology_Mapping_Plan.md) is the detailed
-design source and is kept unchanged.
+v1's `scan_repository.py` → `render_drawio.py` pipeline, MCP server and
+Python guard hook are gone, and so are the fixed master/micro outputs. Ask
+your question instead: "map this repo" gives the old master view, and
+"what does X talk to" gives the old micro view.
+[CHANGELOG.md](CHANGELOG.md) has the full mapping. v1 stays available at the
+[`v1.2.1` tree](https://github.com/arav7781/service-topology/tree/63b28d5).
 
 ## Contributing
 
-The full guide is **[CONTRIBUTING.md](CONTRIBUTING.md)**. The short version:
-the most valuable contribution is a real repository this tool got wrong — a
-missed binding, a false edge, a service boundary it misjudged.
-
-- **Never invent an edge.** A change to an extractor must preserve the rule
-  that an unresolved call is dropped, never guessed at.
-- **Standard library only**, in `topology_lib/` and the scripts.
-- **Determinism is a released guarantee.** Re-running the pipeline on
-  unchanged code must produce byte-identical output.
-- Run `tools/sync_hosts.py --write` after touching `references/`,
-  `templates/`, or `scripts/` — the four host trees must stay byte-identical.
+The most valuable contribution is a repository this got wrong. Adding an
+ecosystem means adding one row to
+[`signatures.md`](skills/topology-cartographer/references/signatures.md),
+a snippet to a fixture, and that snippet's expected ledger lines - no code.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Roadmap
 
-| Version | Theme | Status |
-|---|---|---|
-| **V1** | Kafka (5 ecosystems) and REST/gRPC extraction, deterministic layout, `.drawio` + Mermaid rendering, four hosts, MCP server | Shipped |
-| **V2** | Schema-registry awareness (Avro/Protobuf/JSON Schema), stale-diagram diffing, consumer-group topology, dead-letter recognition | Planned |
-| **V3** | .NET, Ruby, PHP, Rust coverage; service-mesh and API-gateway config as an edge source; Kubernetes as a service-boundary source | Planned |
-| **V4** | RabbitMQ, AWS SNS/SQS/EventBridge, Google Pub/Sub, Azure Service Bus | Planned |
-
-Delivery detail, success metrics, and the quality-review questions any change
-to extraction should pass:
-[docs/implementation-roadmap.md](docs/implementation-roadmap.md).
+- **Ledger in CI** - a GitHub Action that runs the `diff` lens on every PR and
+  comments with the architecture change.
+- **Schema awareness** - Avro, Protobuf and JSON Schema registries as receipts
+  for event payloads.
+- **More signatures** - Elixir, Erlang, Dapr, Temporal, service-mesh routes as
+  edge sources.
+- **Ledger merge** - combine ledgers from several repositories into one
+  organisation-wide view.
 
 ## Licence
 
