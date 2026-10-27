@@ -1,15 +1,15 @@
 name: Feature request
-description: Propose a new ecosystem, a layout improvement, a new host, or a change to the graph model.
+description: Propose a new ecosystem, lens, review check, host, or a change to the ledger format.
 title: "[feat] "
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Check [docs/implementation-roadmap.md](https://github.com/arav7781/service-topology/blob/main/docs/implementation-roadmap.md)
+        Check the [roadmap](https://github.com/arav7781/service-topology#roadmap)
         first — your idea may already be scheduled for a version, or may
-        already be listed as an explicit non-goal (runtime observation, a
-        custom renderer, LLM-authored XML).
+        already be ruled out (runtime observation, a runtime dependency, a
+        custom renderer).
   - type: dropdown
     id: area
     attributes:
@@ -19,10 +19,10 @@ body:
         - New sync-call framework (HTTP/gRPC)
         - New message broker (RabbitMQ, SNS/SQS, Pub/Sub, ...)
         - Config resolution (a new config format or source)
-        - Layout / rendering
+        - Lens / diagram conventions
         - New host support
-        - MCP server
-        - Graph model / schema
+        - Review checks (smells)
+        - Ledger format
         - Documentation
         - Other
     validations:
@@ -45,7 +45,7 @@ body:
     id: cost
     attributes:
       label: What it costs
-      description: Does this add a dependency (the project has zero by design), affect determinism, or change what counts as [CODE] vs [INFERENCE]?
+      description: Does this add a runtime dependency (the project has none by design), grow an instruction file past its token budget, or change what counts as CODE vs INFERENCE?
     validations:
       required: true
   - type: checkboxes

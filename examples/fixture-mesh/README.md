@@ -1,28 +1,26 @@
 # fixture-mesh
 
-A deliberately small, deliberately fake three-service system, used to test
-Topology Cartographer end to end. It is **not** a runnable application: there
-are no dependencies, no build, and no tests. Every file exists to give the
-extractors something real to read.
-
-What it contains, and which extractor each part exercises:
+A small, deliberately fake three-service system for testing Topology
+Cartographer end to end. It isn't a runnable application: there are no
+dependencies, no build and no tests. Every file exists to give the sweeps
+something real to read.
 
 | Path | Language | Exercises |
 |---|---|---|
 | `services/orders` | Go | `segmentio/kafka-go` producer, PostgreSQL connection string, third-party HTTPS call, OpenAPI spec |
-| `services/billing` | Python | `kafka-python` consumer, `requests` call resolved through a config base URL, Redis, an unresolvable gRPC stub |
-| `services/notifications` | TypeScript | `kafkajs` consumer and producer, `fetch` call |
-| `docker-compose.yml` | - | service hostnames, `depends_on`, infrastructure containers, the env var the billing base URL resolves through |
+| `services/billing` | Python | `kafka-python` consumer with its group in an env default, `requests` call through a config base URL, Redis, an unconfirmable gRPC stub |
+| `services/notifications` | TypeScript | `kafkajs` consumer and producer, `fetch` through a file constant |
+| `docker-compose.yml` | - | Hostnames, env values, `depends_on`, infrastructure images |
 
-Expected result: 3 services, 2 topics, 3 external systems, and exactly one
-`[INFERENCE]` edge - the gRPC stub in `services/billing/billing/inventory.py`,
-which has no `.proto` anywhere in the fixture and so cannot be confirmed.
+Expected result: 3 services and 1 referenced-only service, 2 topics, 3 stores
+and externals, 10 edges - exactly one of them `INFERENCE` (the gRPC stub in
+`services/billing/billing/inventory.py`, which has no `.proto` anywhere) - and
+1 gap.
 
-Regenerate the worked examples from it with:
+The output in [`service-topology/`](service-topology/) came from following the
+skill against this directory. Check its receipts with:
 
 ```bash
-python3 skills/topology-cartographer/scripts/scan_repository.py \
-    examples/fixture-mesh -o /tmp/scan.json
-python3 skills/topology-cartographer/scripts/build_graph_model.py \
-    --input /tmp/scan.json --output-root /tmp/out -o /tmp/out/graph-model.json
+bash tools/check-ledger.sh examples/fixture-mesh \
+     examples/fixture-mesh/service-topology/topology.ledger
 ```

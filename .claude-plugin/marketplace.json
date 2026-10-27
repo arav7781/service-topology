@@ -12,8 +12,8 @@
     {
       "name": "topology-cartographer",
       "source": "./",
-      "description": "Evidence-first service topology mapping. Scans a repository for Kafka producer/consumer bindings and synchronous service-to-service calls, then renders .drawio and Mermaid architecture diagrams where every edge cites a file and line. Mapping only - never modifies the analysed repository, never executes it, never contacts a live system.",
-      "version": "1.2.1",
+      "description": "Ask your codebase an architecture question and get the one diagram that answers it, with a file:line receipt on every arrow. Zero runtime: pure Markdown instructions your agent follows with its own search and read tools - no Python, no MCP server. Maps Kafka, RabbitMQ, SQS, NATS and Pub/Sub bindings, REST/gRPC/GraphQL calls and datastores into a diffable ledger, then draws focus, lineage, path, impact, diff or review views in Mermaid (draw.io on request). Read-only on the analysed code.",
+      "version": "2.0.0",
       "author": {
         "name": "Arav Saxena"
       },
@@ -23,12 +23,15 @@
       "keywords": [
         "architecture",
         "diagrams",
-        "kafka",
+        "mermaid",
         "microservices",
-        "drawio",
+        "kafka",
+        "event-driven",
         "topology",
-        "service-map",
-        "code-review"
+        "blast-radius",
+        "architecture-review",
+        "agent-skill",
+        "zero-dependency"
       ],
       "category": "productivity"
     }

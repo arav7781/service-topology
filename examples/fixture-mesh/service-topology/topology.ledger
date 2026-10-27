@@ -1,0 +1,21 @@
+# topology.ledger v2 · repo=fixture-mesh · commit=none · scopes=all
+N InventoryService ref grpc | services/billing/billing/inventory.py:14
+N api.stripe.com ext https | services/orders/payments.go:10
+N billing-cache cache redis | docker-compose.yml:37,38
+N billing-svc svc python | services/billing/pyproject.toml:2; docker-compose.yml:15
+N notifications-svc svc typescript | services/notifications/package.json:2; docker-compose.yml:25
+N notifications.sent topic kafka | services/notifications/src/consumer.ts:25
+N orders-db db postgres | docker-compose.yml:32,33
+N orders-svc svc go | services/orders/go.mod:1; docker-compose.yml:4
+N orders.created topic kafka | services/orders/kafka/producer.go:14
+E billing-svc grpc InventoryService | Reserve | INFERENCE | services/billing/billing/inventory.py:14,15 | stub is used, but no .proto or server registration is in the repository (the docstring says the .proto lives elsewhere); vendoring it would confirm the owner
+E billing-svc http orders-svc | GET /orders/{id} | CODE | services/billing/billing/orders_client.py:12,7; docker-compose.yml:18; services/orders/api/openapi.yaml:8 | base URL from env ORDERS_SERVICE_URL
+E billing-svc sub orders.created | group=billing | CODE | services/billing/billing/consumers.py:13,14,7; docker-compose.yml:19 | group from env BILLING_GROUP_ID, default billing
+E billing-svc uses billing-cache | redis | CODE | services/billing/billing/cache.py:5; docker-compose.yml:20,22
+E notifications-svc http orders-svc | GET /orders/{id} | CODE | services/notifications/src/orders.ts:5,1; services/orders/api/openapi.yaml:8
+E notifications-svc pub notifications.sent | key=orderId | CODE | services/notifications/src/consumer.ts:25,26
+E notifications-svc sub orders.created | group=notifications | CODE | services/notifications/src/consumer.ts:13,8
+E orders-svc http api.stripe.com | POST /v1/charges | CODE | services/orders/payments.go:10
+E orders-svc pub orders.created | key=orderID | CODE | services/orders/kafka/producer.go:21,22,14
+E orders-svc uses orders-db | sql | CODE | services/orders/main.go:18,11; docker-compose.yml:10,12
+G InventoryService | owner unknown - the .proto is generated at deploy time from another repository; vendoring it would resolve the edge | services/billing/billing/inventory.py:3

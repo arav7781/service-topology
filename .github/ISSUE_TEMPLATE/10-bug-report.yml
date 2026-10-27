@@ -1,17 +1,15 @@
 name: Bug report
-description: Something in the tooling broke — a script error, the guard hook misfiring, the skill not loading, a host-tree sync problem, the MCP server failing to connect.
+description: Something mechanical broke - the skill didn't load or trigger, a host mirror is out of date, a view doesn't render, or a repository tool failed.
 title: "[bug] "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        This form is for **mechanical** problems — the pipeline crashed, the
-        hook denied something it shouldn't have, the MCP server hung. If the
-        tooling ran fine but the *diagram* is wrong (a missed binding, a false
-        edge, a misjudged service boundary), use the **Extraction issue**
-        form instead — that's the report this project is actually built to
-        act on.
+        This form is for **mechanical** problems. If the skill ran but the
+        *map* is wrong - a missed binding, a false edge, a misjudged service
+        boundary - use the **Extraction issue** form instead. That's the report
+        this project is built to act on.
   - type: dropdown
     id: host
     attributes:
@@ -21,7 +19,8 @@ body:
         - GitHub Copilot (VS Code)
         - Cursor
         - Antigravity
-        - Not host-specific (script / repo tooling / MCP server)
+        - Another agent (via AGENTS.md)
+        - Not host-specific (repository tooling)
     validations:
       required: true
   - type: dropdown
@@ -29,12 +28,14 @@ body:
     attributes:
       label: Component
       options:
-        - Skill loading / activation
-        - A helper script (scripts/*.py or topology_lib/)
-        - hooks/topology_guard.py
-        - tools/sync_hosts.py
-        - mcp-server/
-        - Templates / documentation
+        - Skill loading / triggering
+        - A view (Mermaid or draw.io) doesn't render
+        - Ledger format
+        - Helper agents (topology-extractor / topology-verifier)
+        - tools/sync-hosts.sh
+        - tools/check-ledger.sh
+        - tools/token-budget.sh
+        - Documentation
         - Other
     validations:
       required: true
@@ -42,10 +43,10 @@ body:
     id: what-happened
     attributes:
       label: What happened
-      description: Include the exact command or prompt, and the full error output or wrong behaviour.
+      description: The exact prompt or command, and the output or wrong behaviour.
       placeholder: |
-        Ran: python3 skills/topology-cartographer/scripts/scan_repository.py ...
-        Got: Traceback ...
+        Asked: "what does billing-svc talk to?"
+        Got: ...
     validations:
       required: true
   - type: textarea
@@ -58,8 +59,8 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: OS, Python version, host version.
-      placeholder: macOS 15.5 · Python 3.12.4 · Claude Code 2.x
+      description: OS, host and version, model.
+      placeholder: Windows 11 · Claude Code 2.x · Opus
     validations:
       required: true
   - type: checkboxes

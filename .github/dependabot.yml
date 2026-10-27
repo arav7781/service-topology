@@ -1,6 +1,6 @@
-# The project has zero runtime dependencies by design — topology_lib/ and the
-# six scripts use only the Python standard library. The only third-party code
-# it consumes is the pinned GitHub Actions in ci.yml. Keep those patched.
+# The project has no runtime dependencies by design - the skill is Markdown,
+# and the repository tools are POSIX shell. The only third-party code it
+# consumes is the pinned GitHub Actions in ci.yml. Keep those patched.
 version: 2
 updates:
   - package-ecosystem: github-actions

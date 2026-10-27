@@ -1,0 +1,4 @@
+# Ledgers cite exact lines and the tools are shell scripts, so keep LF
+# everywhere - a CRLF checkout on Windows would break both.
+* text=auto eol=lf
+*.png binary

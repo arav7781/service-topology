@@ -3,8 +3,9 @@
 # Owners" in the branch-protection rule for main.
 *   @arav7781
 
-# Safety-critical surfaces always route to the owner explicitly, even if the
-# wildcard above is ever narrowed.
-/hooks/            @arav7781
+# The instructions agents follow, and what they are allowed to run, always
+# route to the owner explicitly, even if the wildcard above is ever narrowed.
+/skills/           @arav7781
+/agents/           @arav7781
 /.claude-plugin/   @arav7781
 /SECURITY.md       @arav7781

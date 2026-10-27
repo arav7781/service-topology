@@ -1,5 +1,5 @@
 name: Extraction issue
-description: The pipeline ran fine, but the diagram is wrong — a missed binding, an edge that doesn't exist, or a misjudged service boundary. This is the most valuable report you can file.
+description: The skill ran, but the map is wrong — a missed binding, an edge that doesn't exist, or a misjudged service boundary. This is the most valuable report you can file.
 title: "[extraction] "
 labels: ["extraction"]
 body:
@@ -33,6 +33,13 @@ body:
         - kafkajs / node-rdkafka / NestJS
         - segmentio/kafka-go / sarama
         - Spring Cloud Stream (config bindings)
+        - RabbitMQ / AMQP
+        - AWS SQS / SNS / EventBridge / Kinesis
+        - GCP Pub/Sub
+        - NATS
+        - Azure Service Bus / Event Hubs
+        - Redis streams / Celery / BullMQ / Sidekiq
+        - Deploy config / address sweep (compose, Kubernetes, Helm)
         - HTTP client (requests/axios/RestTemplate/Feign/net-http/resty)
         - gRPC (.proto / generated stubs)
         - OpenAPI spec
@@ -54,8 +61,8 @@ body:
     id: got
     attributes:
       label: What the tool produced
-      description: Paste the relevant edge(s) from graph-model.json or evidence/sources.md.
-      render: json
+      description: Paste the relevant line(s) from topology.ledger, or the line the agent should have written.
+      render: text
     validations:
       required: true
   - type: textarea
@@ -70,7 +77,7 @@ body:
     attributes:
       label: Before submitting
       options:
-        - label: I checked the relevant playbook (kafka-extraction-playbook.md or sync-call-extraction-playbook.md) and this isn't documented as a known gap.
+        - label: I checked references/signatures.md and this ecosystem or pattern is not documented as a known gap.
           required: true
         - label: My snippet is minimal and does not contain anything sensitive from a real codebase.
           required: true
