@@ -1,0 +1,41 @@
+# topology.ledger v2 · repo=fixture-polyglot · commit=none · scopes=all
+N ANALYTICS_TOPIC? topic kafka | services/analytics/analytics/consume.py:5
+N analytics svc python | services/analytics/pyproject.toml:2; docker-compose.yml:28
+N api.adyen.com ext https | services/payments/events.go:14
+N api.easypost.com ext https | services/shipping/src/carrier.ts:4
+N catalog svc python | services/catalog/pyproject.toml:2; docker-compose.yml:32
+N catalog-cache cache redis | docker-compose.yml:38,39
+N fulfillment svc python | services/fulfillment/pyproject.toml:2; docker-compose.yml:15
+N gateway svc typescript | services/gateway/package.json:2; docker-compose.yml:2
+N notifier svc go | services/notifier/go.mod:1; docker-compose.yml:24
+N orders-api svc java | services/orders-api/src/main/resources/application.yml:3; services/orders-api/pom.xml:9; docker-compose.yml:7
+N orders-db db postgres | docker-compose.yml:36,37
+N orders.audit topic kafka | services/orders-api/src/main/java/com/shop/orders/Topics.java:5
+N orders.placed topic kafka | services/orders-api/src/main/java/com/shop/orders/Topics.java:4
+N payments svc go | services/payments/go.mod:1; docker-compose.yml:10
+N rabbitmq:payments topic rabbitmq | services/payments/events.go:15
+N shipments queue sqs | services/fulfillment/.env:1; docker-compose.yml:22
+N shipping svc typescript | services/shipping/package.json:2; docker-compose.yml:19
+N user.notify topic nats | services/shipping/src/notify.ts:7
+E analytics sub ANALYTICS_TOPIC? | group=analytics | INFERENCE | services/analytics/analytics/consume.py:5; docker-compose.yml:31 | the topic is read from ANALYTICS_TOPIC, which has no value anywhere in the repository; the deploy pipeline's value would confirm it
+E catalog uses catalog-cache | redis | CODE | services/catalog/catalog/app.py:7; docker-compose.yml:35
+E fulfillment pub shipments | - | CODE | services/fulfillment/fulfillment/shipments.py:9; services/fulfillment/.env:1 | queue URL from env SHIPMENTS_QUEUE_URL
+E fulfillment sub orders.placed | group=fulfillment | CODE | services/fulfillment/fulfillment/main.py:9,6,8; services/fulfillment/fulfillment/bus.py:11,8; services/fulfillment/.env:2 | through the EventBus wrapper, which delegates to confluent_kafka
+E fulfillment sub rabbitmq:payments | queue=fulfillment.payments | CODE | services/fulfillment/fulfillment/rabbit.py:13,6 | queue bound to the exchange with routing key payment.captured
+E fulfillment uses orders-db | sql | CODE | services/fulfillment/fulfillment/db.py:4; docker-compose.yml:18
+E gateway http catalog | GET /products/{id} | CODE | services/gateway/src/routes.ts:16,6; docker-compose.yml:6
+E gateway http orders-api | POST /orders | CODE | services/gateway/src/routes.ts:11,5; docker-compose.yml:5 | axios base URL from env ORDERS_API_URL
+E notifier sub user.notify | - | CODE | services/notifier/main.go:11
+E orders-api grpc catalog | Reserve | CODE | services/orders-api/src/main/java/com/shop/orders/InventoryClient.java:13,17,11; services/orders-api/src/main/resources/application.yml:7; services/catalog/catalog/grpc_server.py:15; protos/inventory.proto:4 | address catalog:50051 from inventory.address; catalog registers the Inventory server
+E orders-api http payments | POST /charges | CODE | services/orders-api/src/main/java/com/shop/orders/PaymentsClient.java:6,8; docker-compose.yml:10 | Feign client name matches the compose service
+E orders-api pub orders.audit | key=order.id | CODE | services/orders-api/src/main/java/com/shop/orders/OrderEvents.java:16,8; services/orders-api/src/main/java/com/shop/orders/Topics.java:5 | topic from the constant Topics.ORDER_AUDIT
+E orders-api pub orders.placed | key=order.id | CODE | services/orders-api/src/main/java/com/shop/orders/OrderEvents.java:15,8; services/orders-api/src/main/java/com/shop/orders/Topics.java:4 | topic from the constant Topics.ORDER_PLACED
+E orders-api uses orders-db | sql | CODE | services/orders-api/src/main/resources/application.yml:5; docker-compose.yml:9
+E payments http api.adyen.com | POST /v71/payments | CODE | services/payments/events.go:14
+E payments http orders-api | GET /orders/{id} | CODE | services/payments/main.go:18,9; docker-compose.yml:13 | base URL from env ORDERS_API_URL
+E payments pub rabbitmq:payments | rk=payment.captured | CODE | services/payments/events.go:15
+E shipping http api.easypost.com | POST /v2/shipments | CODE | services/shipping/src/carrier.ts:4
+E shipping pub user.notify | - | CODE | services/shipping/src/notify.ts:7
+E shipping sub shipments | - | CODE | services/shipping/src/poller.ts:7; docker-compose.yml:22 | queue URL from env SHIPMENTS_QUEUE_URL
+G ANALYTICS_TOPIC? | set only at deploy time - compose passes ${ANALYTICS_TOPIC} through from the host | docker-compose.yml:31
+G notifier | publishes to a subject computed per tenant ("tenant." + tenantID + ".alerts"), which cannot be known without running it | services/notifier/main.go:19

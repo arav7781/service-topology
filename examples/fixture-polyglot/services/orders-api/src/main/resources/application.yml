@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: orders-api
+  datasource:
+    url: jdbc:postgresql://orders-db:5432/orders
+inventory:
+  address: catalog:50051

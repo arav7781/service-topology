@@ -1,0 +1,45 @@
+services:
+  gateway:
+    build: ./services/gateway
+    environment:
+      ORDERS_API_URL: http://orders-api:8080
+      CATALOG_URL: http://catalog:8000
+  orders-api:
+    build: ./services/orders-api
+    depends_on: [orders-db, kafka]
+  payments:
+    build: ./services/payments
+    environment:
+      ORDERS_API_URL: http://orders-api:8080
+      AMQP_URL: amqp://rabbitmq:5672
+  fulfillment:
+    build: ./services/fulfillment
+    env_file: ./services/fulfillment/.env
+    depends_on: [orders-db, kafka, rabbitmq]
+  shipping:
+    build: ./services/shipping
+    environment:
+      SHIPMENTS_QUEUE_URL: https://sqs.eu-west-1.amazonaws.com/123456789012/shipments
+      NATS_URL: nats://nats:4222
+  notifier:
+    build: ./services/notifier
+    environment:
+      NATS_URL: nats://nats:4222
+  analytics:
+    build: ./services/analytics
+    environment:
+      ANALYTICS_TOPIC: ${ANALYTICS_TOPIC}
+  catalog:
+    build: ./services/catalog
+    environment:
+      CACHE_URL: redis://catalog-cache:6379/0
+  orders-db:
+    image: postgres:16
+  catalog-cache:
+    image: redis:7
+  kafka:
+    image: redpandadata/redpanda:v24.2.4
+  rabbitmq:
+    image: rabbitmq:3.13
+  nats:
+    image: nats:2.10

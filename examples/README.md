@@ -8,6 +8,8 @@ beside it.
 | Example | What it shows |
 |---|---|
 | [`fixture-mesh/`](fixture-mesh/) | Three services - Go, Python, TypeScript - one Kafka topic, REST callbacks and an unconfirmable gRPC stub. Five views from five questions, plus a draw.io file |
+| [`fixture-polyglot/`](fixture-polyglot/) | Eight services over Kafka, RabbitMQ, SQS and NATS, with bindings behind wrappers and constants, a deploy-time-only topic, planted traps, and a review that finds a sync cycle and a shared database |
+| [`third-party/online-boutique/`](third-party/online-boutique/) | Google's twelve-service gRPC demo, mapped at a pinned commit. Only the ledger and the view are kept here; CI re-checks the receipts against upstream |
 
 ## What to look at
 
