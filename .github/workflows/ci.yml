@@ -33,6 +33,18 @@ jobs:
         run: |
           bash tools/check-ledger.sh examples/fixture-mesh \
             examples/fixture-mesh/service-topology/topology.ledger
+          bash tools/check-ledger.sh examples/fixture-polyglot \
+            examples/fixture-polyglot/service-topology/topology.ledger
+
+      - name: The Online Boutique ledger still resolves at its pinned commit
+        run: |
+          git init -q /tmp/boutique
+          git -C /tmp/boutique fetch -q --depth 1 \
+            https://github.com/GoogleCloudPlatform/microservices-demo \
+            38e7348eb289eb5b87c0c6e8cb19ced0449dc389
+          git -C /tmp/boutique -c advice.detachedHead=false checkout -q FETCH_HEAD
+          bash tools/check-ledger.sh /tmp/boutique \
+            examples/third-party/online-boutique/topology.ledger
 
       - name: Manifests are valid JSON and versions agree
         run: |

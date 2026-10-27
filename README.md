@@ -81,6 +81,24 @@ script runner forbidden to think. v2 is instructions only. The agent resolves
 what regexes can't: wrapped clients, cross-file constants, addresses set in
 Kubernetes and read in code. The receipts rules keep it honest.
 
+## Tested on real code
+
+The skill was followed on three codebases, and every edge it wrote was
+checked against its receipt:
+
+| Repository | Ground truth | Edges found | False edges |
+|---|---|---|---|
+| [`fixture-mesh`](examples/fixture-mesh/) - 3 services | v1's 10 reference edges | 10 / 10 | 0 |
+| [`fixture-polyglot`](examples/fixture-polyglot/) - 8 services, 4 brokers | 20 planted edges, 5 traps | 20 / 20 | 0 - no trap fired |
+| [Online Boutique](examples/third-party/online-boutique/views/overview.md) - Google's 12-service gRPC demo | 16 edges in its architecture diagram | 16 / 16, plus 6 real code paths the diagram omits | 0 |
+
+The third-party run exposed eleven gaps in the search recipes - Go stubs built
+from struct fields, Node gRPC registration, generated-code noise, addresses
+that exist only in Kubernetes. All were fixed before these numbers were
+recorded; [docs/evaluation.md](docs/evaluation.md) lists each one. The
+evaluator also wrote v2, so this isn't a blind test, and the report says so.
+CI clones Online Boutique at the pinned commit and re-checks every receipt.
+
 ## Install
 
 **Claude Code** - as a plugin:

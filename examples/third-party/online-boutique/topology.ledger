@@ -1,0 +1,42 @@
+# topology.ledger v2 · repo=GoogleCloudPlatform/microservices-demo · commit=38e7348 · scopes=all
+N adservice svc java | src/adservice/src/main/java/hipstershop/AdService.java:84; src/adservice/settings.gradle:1
+N alloydb db alloydb | src/productcatalogservice/catalog_loader.go:37
+N cartservice svc csharp | src/cartservice/src/Startup.cs:74
+N checkoutservice svc go | src/checkoutservice/main.go:142
+N currencyservice svc node | src/currencyservice/server.js:185
+N emailservice svc python | src/emailservice/email_server.py:126
+N frontend svc go | src/frontend/go.mod:1
+N gemini ext google-genai | src/shoppingassistantservice/shoppingassistantservice.py:22
+N loadgenerator svc python | src/loadgenerator/locustfile.py:90
+N paymentservice svc node | src/paymentservice/server.js:89
+N productcatalogservice svc go | src/productcatalogservice/server.go:143
+N recommendationservice svc python | src/recommendationservice/recommendation_server.py:143
+N redis-cart cache redis | kubernetes-manifests/cartservice.yaml:92,118
+N shippingservice svc go | src/shippingservice/main.go:92
+N shoppingassistantservice svc python | src/shoppingassistantservice/shoppingassistantservice.py:63
+N spanner db spanner | src/cartservice/src/cartstore/SpannerCartStore.cs:59
+E cartservice uses alloydb | optional: ALLOYDB_PRIMARY_IP | CODE | src/cartservice/src/Startup.cs:49,32 | replaces Redis when ALLOYDB_PRIMARY_IP is set
+E cartservice uses redis-cart | redis | CODE | src/cartservice/src/Startup.cs:36,29; kubernetes-manifests/cartservice.yaml:50,51
+E cartservice uses spanner | optional | CODE | src/cartservice/src/Startup.cs:44; src/cartservice/src/cartstore/SpannerCartStore.cs:59 | replaces Redis when Spanner is configured
+E checkoutservice grpc cartservice | GetCart, EmptyCart | CODE | src/checkoutservice/main.go:325,333,113; kubernetes-manifests/checkoutservice.yaml:67,68
+E checkoutservice grpc currencyservice | Convert | CODE | src/checkoutservice/main.go:360,114; kubernetes-manifests/checkoutservice.yaml:65,66
+E checkoutservice grpc emailservice | SendOrderConfirmation | CODE | src/checkoutservice/main.go:380,115; kubernetes-manifests/checkoutservice.yaml:63,64
+E checkoutservice grpc paymentservice | Charge | CODE | src/checkoutservice/main.go:370,116; kubernetes-manifests/checkoutservice.yaml:61,62
+E checkoutservice grpc productcatalogservice | ProductCatalogService | CODE | src/checkoutservice/main.go:341,112; kubernetes-manifests/checkoutservice.yaml:57,58
+E checkoutservice grpc shippingservice | GetQuote, ShipOrder | CODE | src/checkoutservice/main.go:314,315,387,111; kubernetes-manifests/checkoutservice.yaml:59,60
+E frontend grpc adservice | GetAds | CODE | src/frontend/rpc.go:123; src/frontend/main.go:138; kubernetes-manifests/frontend.yaml:81,82
+E frontend grpc cartservice | GetCart, EmptyCart, AddItem | CODE | src/frontend/rpc.go:58,63,68; src/frontend/main.go:134; kubernetes-manifests/frontend.yaml:73,74
+E frontend grpc checkoutservice | PlaceOrder | CODE | src/frontend/handlers.go:354,355; src/frontend/main.go:136; kubernetes-manifests/frontend.yaml:79,80
+E frontend grpc currencyservice | GetSupportedCurrencies, Convert | CODE | src/frontend/rpc.go:31,32,81,82; src/frontend/main.go:133; kubernetes-manifests/frontend.yaml:71,72
+E frontend grpc productcatalogservice | ListProducts, GetProduct | CODE | src/frontend/rpc.go:46,47,52,53; src/frontend/main.go:132; kubernetes-manifests/frontend.yaml:69,70
+E frontend grpc recommendationservice | ListRecommendations | CODE | src/frontend/rpc.go:100; src/frontend/main.go:135; kubernetes-manifests/frontend.yaml:75,76
+E frontend grpc shippingservice | GetQuote | CODE | src/frontend/rpc.go:88; src/frontend/main.go:137; kubernetes-manifests/frontend.yaml:77,78
+E frontend http shoppingassistantservice | POST / | CODE | src/frontend/handlers.go:465,464; src/frontend/main.go:139; kubernetes-manifests/frontend.yaml:83,84
+E loadgenerator http frontend | locust | CODE | src/loadgenerator/Dockerfile:52; src/loadgenerator/locustfile.py:90; kubernetes-manifests/loadgenerator.yaml:69,70
+E productcatalogservice uses alloydb | optional: ALLOYDB_CLUSTER_NAME | CODE | src/productcatalogservice/catalog_loader.go:38,37,90 | replaces the bundled JSON catalog when ALLOYDB_CLUSTER_NAME is set
+E recommendationservice grpc productcatalogservice | ListProducts | CODE | src/recommendationservice/recommendation_server.py:73,136,131; kubernetes-manifests/recommendationservice.yaml:60,61
+E shoppingassistantservice http gemini | gemini-1.5-flash | CODE | src/shoppingassistantservice/shoppingassistantservice.py:102,72,55,22
+E shoppingassistantservice uses alloydb | vector store | CODE | src/shoppingassistantservice/shoppingassistantservice.py:41,52,31
+G alloydb | cluster and instance come from deploy-time env (ALLOYDB_*); whether the three users share one cluster is not knowable from the repository | src/productcatalogservice/catalog_loader.go:90
+G frontend | packaging-info http.Get target is PACKAGING_SERVICE_URL, which no manifest sets (commented out) | src/frontend/packaging_info.go:54; kubernetes-manifests/frontend.yaml:98
+G opentelemetry | trace export to COLLECTOR_SERVICE_ADDR is optional and has no value in the default manifests | src/frontend/main.go:178
