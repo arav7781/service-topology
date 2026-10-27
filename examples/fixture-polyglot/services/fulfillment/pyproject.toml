@@ -1,0 +1,4 @@
+[project]
+name = "fulfillment"
+version = "0.1.0"
+dependencies = ["confluent-kafka", "pika", "boto3", "sqlalchemy"]
