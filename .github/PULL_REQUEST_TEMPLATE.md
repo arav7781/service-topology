@@ -1,6 +1,6 @@
 <!--
-One coherent change per PR. A new extractor, a bug fix, a doc improvement —
-pick one.
+One coherent change per PR: a new signature row, a lens fix, a doc
+improvement - pick one.
 -->
 
 ## What and why
@@ -11,24 +11,21 @@ Closes #
 
 ## Type of change
 
-- [ ] New extractor / ecosystem — **fixture added or extended in `examples/fixture-mesh/`** and the relevant playbook updated
-- [ ] Bug fix in an existing extractor — edge that was false/missed, now corrected
-- [ ] Graph model / schema change — `docs/output-format.md` and `templates/graph-model-schema.md` updated together
-- [ ] Layout / rendering change — `docs/architecture.md` or the relevant reference updated if the algorithm changed
-- [ ] Guard hook change — all four payload dialects handled; deny tests extended
+- [ ] New ecosystem / signature row - fixture snippet and expected ledger lines added
+- [ ] Fix to an existing signature or the resolution ladder - a false or missed edge, now correct
+- [ ] Ledger grammar or evidence rules - `SKILL.md` §5, README and example ledgers updated together
+- [ ] Lens or diagram conventions
+- [ ] Review checks (`smells.md`)
 - [ ] New host support
-- [ ] MCP server change
 - [ ] Documentation / examples
-- [ ] Repo infrastructure (CI, templates, packaging)
+- [ ] Repository tooling (CI, `tools/`, templates)
 
 ## Verification
 
-- [ ] Edited the **canonical** tree (`skills/topology-cartographer/`, `agents/`), then ran `python3 tools/sync_hosts.py --write`
-- [ ] `python3 tools/sync_hosts.py` reports no drift
-- [ ] `python3 -m py_compile skills/topology-cartographer/scripts/*.py skills/topology-cartographer/scripts/topology_lib/*.py mcp-server/*.py hooks/*.py tools/*.py` passes
-- [ ] The pipeline is still deterministic over `examples/fixture-mesh/` (run twice, `diff -r`)
-- [ ] `validate_graph_model.py --repo examples/fixture-mesh` reports no problems
-- [ ] `python3 mcp-server/test_client.py` passes (if the MCP server or graph model changed)
-- [ ] Guard-hook deny tests pass in all host dialects (if `hooks/topology_guard.py` changed)
-- [ ] No edge was added without a `path/to/file:LINE` citation; no `[INFERENCE]` edge without a `note`
-- [ ] Documentation updated where behaviour changed (README, docs/, the relevant reference playbook)
+- [ ] Edited the canonical tree (`skills/topology-cartographer/`, `agents/`), then ran `bash tools/sync-hosts.sh`
+- [ ] `bash tools/sync-hosts.sh --check` reports no drift
+- [ ] `bash tools/token-budget.sh` passes, and no budget was raised without a reason in this PR
+- [ ] `bash tools/check-ledger.sh` passes for every example ledger I touched
+- [ ] I opened every receipt I added and it shows the binding its edge claims
+- [ ] No edge without a receipt; no `INFERENCE` edge without a reason
+- [ ] Any Mermaid I changed renders (GitHub preview or mermaid.live)
